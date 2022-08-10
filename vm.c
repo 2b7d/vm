@@ -32,10 +32,9 @@ void vm_exec_inst(struct vm *vm, struct inst *inst)
       vm->stack[vm->stack_size - 2] += vm->stack[vm->stack_size - 1];
       vm->stack_size -= 1;
       break;
-    default:
+
+    default: assert(0 && "Unreachable");
   }
-
-
 }
 
 void vm_dump_stack(struct vm *vm)
@@ -46,24 +45,24 @@ void vm_dump_stack(struct vm *vm)
   }
 }
 
+static struct inst program[] = {
+  { .kind = INST_KIND_PUSH, .value = 5 },
+  { .kind = INST_KIND_PUSH, .value = 3 },
+  { .kind = INST_KIND_ADD },
+  { .kind = INST_KIND_PUSH, .value = 2 },
+  { .kind = INST_KIND_ADD },
+  { .kind = INST_KIND_ADD }
+};
 
 int main(void)
 {
   static struct vm vm = {0};
 
-  struct inst inst_1 = { .kind = INST_KIND_PUSH, .value = 5 };
-  struct inst inst_2 = { .kind = INST_KIND_PUSH, .value = 3 };
-  struct inst inst_3 = { .kind = INST_KIND_ADD };
+  int sz = sizeof(program) / sizeof(program[0]);
+  for (size_t i = 0; i < sz; ++i) {
+    vm_exec_inst(&vm, &program[i]);
+    vm_dump_stack(&vm);
+  }
 
-  vm_exec_inst(&vm, &inst_1);
-  vm_dump_stack(&vm);
-  vm_exec_inst(&vm, &inst_2);
-  vm_dump_stack(&vm);
-  vm_exec_inst(&vm, &inst_3);
-  vm_dump_stack(&vm);
-  vm_exec_inst(&vm, &inst_1);
-  vm_dump_stack(&vm);
-  vm_exec_inst(&vm, &inst_3);
-  vm_dump_stack(&vm);
   return 0;
 }
