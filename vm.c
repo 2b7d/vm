@@ -1,12 +1,38 @@
 // @TODO(art): Load program from file
-// @TODO(art): Proper errors
 
 #include <stdio.h>
-#include <stdint.h>
+#include <stdlib.h>
 #include <assert.h>
 
 #define VM_STACK_CAP 1024
 #define VM_PROGRAM_CAP 1024
+
+enum err {
+  ERR_OK = 0,
+  ERR_STACK_OVERFLOW,
+  ERR_STACK_UNDERFLOW,
+  ERR_MEM_OUT_OF_RANGE,
+  ERR_DIV_BY_ZERO,
+};
+
+char *err_to_cstr(enum err e)
+{
+  switch (e) {
+  case ERR_STACK_OVERFLOW:
+    return "ERR_STACK_OVERFLOW";
+
+  case ERR_STACK_UNDERFLOW:
+    return "ERR_STACK_UNDERFLOW";
+
+  case ERR_MEM_OUT_OF_RANGE:
+    return "ERR_MEM_OUT_OF_RANGE";
+
+  case ERR_DIV_BY_ZERO:
+    return "ERR_DIV_BY_ZERO";
+
+  case ERR_OK: default: return NULL;
+  }
+}
 
 enum inst_kind {
   INST_KIND_PUSH,
@@ -35,41 +61,57 @@ struct vm {
   int halt;
 };
 
-void vm_exec_inst(struct vm *vm, struct inst *inst)
+enum err vm_exec_inst(struct vm *vm, struct inst *inst)
 {
-  assert(vm->ip >= 0 && vm->ip <= vm->program_size);
+  if ((int) vm->ip < 0 || vm->ip >= vm->program_size) {
+    return ERR_MEM_OUT_OF_RANGE;
+  }
 
   switch (inst->kind) {
   case INST_KIND_PUSH:
-    assert(vm->stack_size < VM_STACK_CAP);
+    if (vm->stack_size >= VM_STACK_CAP) {
+      return ERR_STACK_OVERFLOW;
+    }
+
     vm->stack[vm->stack_size++] = inst->value;
     vm->ip++;
     break;
 
   case INST_KIND_ADD:
-    assert(vm->stack_size > 1);
+    if (vm->stack_size < 2) {
+      return ERR_STACK_UNDERFLOW;
+    }
+
     vm->stack[vm->stack_size - 2] += vm->stack[vm->stack_size - 1];
     vm->stack_size -= 1;
     vm->ip++;
     break;
 
   case INST_KIND_SUB:
-    assert(vm->stack_size > 1);
+    if (vm->stack_size < 2) {
+      return ERR_STACK_UNDERFLOW;
+    }
     vm->stack[vm->stack_size - 2] -= vm->stack[vm->stack_size - 1];
     vm->stack_size -= 1;
     vm->ip++;
     break;
 
   case INST_KIND_MUL:
-    assert(vm->stack_size > 1);
+    if (vm->stack_size < 2) {
+      return ERR_STACK_UNDERFLOW;
+    }
     vm->stack[vm->stack_size - 2] *= vm->stack[vm->stack_size - 1];
     vm->stack_size -= 1;
     vm->ip++;
     break;
 
   case INST_KIND_DIV:
-    assert(vm->stack_size > 1);
-    assert(vm->stack[vm->stack_size - 1] != 0);
+    if (vm->stack_size < 2) {
+      return ERR_STACK_UNDERFLOW;
+    }
+    if (vm->stack[vm->stack_size - 1] == 0) {
+      return ERR_DIV_BY_ZERO;
+    }
     vm->stack[vm->stack_size - 2] /= vm->stack[vm->stack_size - 1];
     vm->stack_size -= 1;
     vm->ip++;
@@ -94,6 +136,8 @@ void vm_exec_inst(struct vm *vm, struct inst *inst)
 
   default: assert(0 && "Unreachable");
   }
+
+  return ERR_OK;
 }
 
 void vm_dump_stack(struct vm *vm)
@@ -105,20 +149,9 @@ void vm_dump_stack(struct vm *vm)
 }
 
 static struct inst program[] = {
-  { .kind = INST_KIND_JMP, .value = 2 },
-  { .kind = INST_KIND_PUSH, .value = 5 },
-
-  { .kind = INST_KIND_PUSH, .value = 3 },
-  { .kind = INST_KIND_PUSH, .value = 9 },
-  { .kind = INST_KIND_MUL },
-
-  { .kind = INST_KIND_PUSH, .value = 26 },
-  { .kind = INST_KIND_SUB },
-
-  { .kind = INST_KIND_JMP_IF, .value = 9 },
   { .kind = INST_KIND_PUSH, .value = 69 },
   { .kind = INST_KIND_PUSH, .value = 420 },
-
+  { .kind = INST_KIND_ADD },
   { .kind = INST_KIND_HALT },
 };
 
@@ -133,8 +166,12 @@ int main(void)
   }
 
   while (!vm.halt) {
-    vm_exec_inst(&vm, &vm.program[vm.ip]);
+    enum err e = vm_exec_inst(&vm, &vm.program[vm.ip]);
     vm_dump_stack(&vm);
+    if (e != ERR_OK) {
+      printf("ERROR: %s\n", err_to_cstr(e));
+      exit(1);
+    }
   }
 
   return 0;
