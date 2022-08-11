@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 #include <assert.h>
 
 #define VM_STACK_CAP 1024
@@ -155,14 +157,55 @@ vm_dump_stack(struct vm *vm)
 }
 
 void
-vm_load_program_from_memory(struct vm *vm,
-                            struct inst *program,
-                            size_t size)
+vm_load_program_from_file(struct vm *vm, char *file_path)
 {
-  for (size_t i = 0; i < size; ++i) {
-    assert(i < VM_PROGRAM_CAP);
-    vm->program[vm->program_size++] = program[i];
+  FILE *f = fopen(file_path, "r");
+  if (f == NULL) {
+    fprintf(stderr, "%s\n", strerror(errno));
+    exit(1);
   }
+
+  while (!feof(f)) {
+    char line[1000] = {0};
+
+    size_t i = 0;
+    char c = fgetc(f);
+
+    while (c != '\n' && !feof(f)) {
+      assert(i < 1000);
+      line[i++] = c;
+      c = fgetc(f);
+    }
+
+    if (*line == '\0') continue;
+
+    char inst[] = {0};
+    int value;
+
+    int matches = sscanf(line, "%s %i", &inst, &value);
+    assert(matches >= 1);
+
+    if (strcmp(inst, "push") == 0) {
+      assert(matches == 2);
+      vm->program[vm->program_size++] = (struct inst) {
+        .kind = INST_KIND_PUSH,
+        .value = value
+      };
+    } else if (strcmp(inst, "add") == 0) {
+      vm->program[vm->program_size++] = (struct inst) {
+        .kind = INST_KIND_ADD,
+      };
+    } else if (strcmp(inst, "halt") == 0) {
+      vm->program[vm->program_size++] = (struct inst) {
+        .kind = INST_KIND_HALT,
+      };
+    } else {
+      fprintf(stderr, "Unknown instruction %s\n", inst);
+      exit(1);
+    }
+  }
+
+  fclose(f);
 }
 
 void
@@ -172,25 +215,23 @@ vm_exec_program(struct vm *vm)
     enum err e = vm_exec_inst(vm, &vm->program[vm->ip]);
     vm_dump_stack(vm);
     if (e != ERR_OK) {
-      printf("ERROR: %s\n", err_to_cstr(e));
+      fprintf(stderr, "ERROR: %s\n", err_to_cstr(e));
       exit(1);
     }
   }
 }
 
-static struct inst program_in_mem[] = {
-  { .kind = INST_KIND_PUSH, .value = 69 },
-  { .kind = INST_KIND_PUSH, .value = 420 },
-  { .kind = INST_KIND_ADD },
-  { .kind = INST_KIND_HALT },
-};
-
-int main(void)
+int main(int argc, char **argv)
 {
   static struct vm vm = {0};
 
-  size_t size = sizeof(program_in_mem) / sizeof(program_in_mem[0]);
-  vm_load_program_from_memory(&vm, program_in_mem, size);
+  if (argc < 2) {
+    fprintf(stderr, "Provide file\n");
+    exit(1);
+  }
+
+  char *in_file = argv[1];
+  vm_load_program_from_file(&vm, in_file);
 
   vm_exec_program(&vm);
 
