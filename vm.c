@@ -235,18 +235,25 @@ vm_exec_program(struct vm *vm)
     enum err e = vm_exec_inst(vm, &vm->program[vm->ip]);
     vm_dump_stack(vm);
     if (e != ERR_OK) {
-      fprintf(stderr, "ERROR: %s\n", err_to_cstr(e));
+      fprintf(stderr, "Error: %s\n", err_to_cstr(e));
       exit(1);
     }
   }
 }
 
-int main(int argc, char **argv)
+void
+print_usage(FILE *stream)
+{
+  fprintf(stream, "Usage: vm [FILE]\n");
+}
+
+int
+main(int argc, char **argv)
 {
   static struct vm vm = {0};
 
   if (argc < 2) {
-    fprintf(stderr, "Provide file\n");
+    print_usage(stderr);
     exit(1);
   }
 
