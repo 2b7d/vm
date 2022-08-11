@@ -12,10 +12,11 @@ enum err {
   ERR_STACK_OVERFLOW,
   ERR_STACK_UNDERFLOW,
   ERR_MEM_OUT_OF_RANGE,
-  ERR_DIV_BY_ZERO,
+  ERR_DIV_BY_ZERO
 };
 
-char *err_to_cstr(enum err e)
+char *
+err_to_cstr(enum err e)
 {
   switch (e) {
   case ERR_STACK_OVERFLOW:
@@ -30,7 +31,10 @@ char *err_to_cstr(enum err e)
   case ERR_DIV_BY_ZERO:
     return "ERR_DIV_BY_ZERO";
 
-  case ERR_OK: default: return NULL;
+  case ERR_OK:
+    return "ERR_OK";
+
+  default: assert(0 && "Unreachable");
   }
 }
 
@@ -42,7 +46,7 @@ enum inst_kind {
   INST_KIND_DIV,
   INST_KIND_JMP,
   INST_KIND_JMP_IF,
-  INST_KIND_HALT,
+  INST_KIND_HALT
 };
 
 struct inst {
@@ -61,7 +65,8 @@ struct vm {
   int halt;
 };
 
-enum err vm_exec_inst(struct vm *vm, struct inst *inst)
+enum err
+vm_exec_inst(struct vm *vm, struct inst *inst)
 {
   if ((int) vm->ip < 0 || vm->ip >= vm->program_size) {
     return ERR_MEM_OUT_OF_RANGE;
@@ -140,7 +145,8 @@ enum err vm_exec_inst(struct vm *vm, struct inst *inst)
   return ERR_OK;
 }
 
-void vm_dump_stack(struct vm *vm)
+void
+vm_dump_stack(struct vm *vm)
 {
   printf("Stack:\n");
   for (size_t i = 0; i < vm->stack_size; ++i) {
@@ -148,7 +154,31 @@ void vm_dump_stack(struct vm *vm)
   }
 }
 
-static struct inst program[] = {
+void
+vm_load_program_from_memory(struct vm *vm,
+                            struct inst *program,
+                            size_t size)
+{
+  for (size_t i = 0; i < size; ++i) {
+    assert(i < VM_PROGRAM_CAP);
+    vm->program[vm->program_size++] = program[i];
+  }
+}
+
+void
+vm_exec_program(struct vm *vm)
+{
+  while (!vm->halt) {
+    enum err e = vm_exec_inst(vm, &vm->program[vm->ip]);
+    vm_dump_stack(vm);
+    if (e != ERR_OK) {
+      printf("ERROR: %s\n", err_to_cstr(e));
+      exit(1);
+    }
+  }
+}
+
+static struct inst program_in_mem[] = {
   { .kind = INST_KIND_PUSH, .value = 69 },
   { .kind = INST_KIND_PUSH, .value = 420 },
   { .kind = INST_KIND_ADD },
@@ -159,20 +189,10 @@ int main(void)
 {
   static struct vm vm = {0};
 
-  int sz = sizeof(program) / sizeof(program[0]);
-  for (size_t i = 0; i < sz; ++i) {
-    assert(i < VM_PROGRAM_CAP);
-    vm.program[vm.program_size++] = program[i];
-  }
+  size_t size = sizeof(program_in_mem) / sizeof(program_in_mem[0]);
+  vm_load_program_from_memory(&vm, program_in_mem, size);
 
-  while (!vm.halt) {
-    enum err e = vm_exec_inst(&vm, &vm.program[vm.ip]);
-    vm_dump_stack(&vm);
-    if (e != ERR_OK) {
-      printf("ERROR: %s\n", err_to_cstr(e));
-      exit(1);
-    }
-  }
+  vm_exec_program(&vm);
 
   return 0;
 }

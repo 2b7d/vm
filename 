@@ -1,0 +1,116 @@
+[1mdiff --git a/vm.c b/vm.c[m
+[1mindex 77023c4..3487f24 100644[m
+[1m--- a/vm.c[m
+[1m+++ b/vm.c[m
+[36m@@ -12,10 +12,11 @@[m [menum err {[m
+   ERR_STACK_OVERFLOW,[m
+   ERR_STACK_UNDERFLOW,[m
+   ERR_MEM_OUT_OF_RANGE,[m
+[31m-  ERR_DIV_BY_ZERO,[m
+[32m+[m[32m  ERR_DIV_BY_ZERO[m
+ };[m
+ [m
+[31m-char *err_to_cstr(enum err e)[m
+[32m+[m[32mchar *[m
+[32m+[m[32merr_to_cstr(enum err e)[m
+ {[m
+   switch (e) {[m
+   case ERR_STACK_OVERFLOW:[m
+[36m@@ -30,7 +31,10 @@[m [mchar *err_to_cstr(enum err e)[m
+   case ERR_DIV_BY_ZERO:[m
+     return "ERR_DIV_BY_ZERO";[m
+ [m
+[31m-  case ERR_OK: default: return NULL;[m
+[32m+[m[32m  case ERR_OK:[m
+[32m+[m[32m    return "ERR_OK";[m
+[32m+[m
+[32m+[m[32m  default: assert(0 && "Unreachable");[m
+   }[m
+ }[m
+ [m
+[36m@@ -42,7 +46,7 @@[m [menum inst_kind {[m
+   INST_KIND_DIV,[m
+   INST_KIND_JMP,[m
+   INST_KIND_JMP_IF,[m
+[31m-  INST_KIND_HALT,[m
+[32m+[m[32m  INST_KIND_HALT[m
+ };[m
+ [m
+ struct inst {[m
+[36m@@ -61,7 +65,8 @@[m [mstruct vm {[m
+   int halt;[m
+ };[m
+ [m
+[31m-enum err vm_exec_inst(struct vm *vm, struct inst *inst)[m
+[32m+[m[32menum err[m
+[32m+[m[32mvm_exec_inst(struct vm *vm, struct inst *inst)[m
+ {[m
+   if ((int) vm->ip < 0 || vm->ip >= vm->program_size) {[m
+     return ERR_MEM_OUT_OF_RANGE;[m
+[36m@@ -140,7 +145,8 @@[m [menum err vm_exec_inst(struct vm *vm, struct inst *inst)[m
+   return ERR_OK;[m
+ }[m
+ [m
+[31m-void vm_dump_stack(struct vm *vm)[m
+[32m+[m[32mvoid[m
+[32m+[m[32mvm_dump_stack(struct vm *vm)[m
+ {[m
+   printf("Stack:\n");[m
+   for (size_t i = 0; i < vm->stack_size; ++i) {[m
+[36m@@ -148,7 +154,31 @@[m [mvoid vm_dump_stack(struct vm *vm)[m
+   }[m
+ }[m
+ [m
+[31m-static struct inst program[] = {[m
+[32m+[m[32mvoid[m
+[32m+[m[32mvm_load_program_from_memory(struct vm *vm,[m
+[32m+[m[32m                            struct inst *program,[m
+[32m+[m[32m                            size_t size)[m
+[32m+[m[32m{[m
+[32m+[m[32m  for (size_t i = 0; i < size; ++i) {[m
+[32m+[m[32m    assert(i < VM_PROGRAM_CAP);[m
+[32m+[m[32m    vm->program[vm->program_size++] = program[i];[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mvoid[m
+[32m+[m[32mvm_exec_program(struct vm *vm)[m
+[32m+[m[32m{[m
+[32m+[m[32m  while (!vm->halt) {[m
+[32m+[m[32m    enum err e = vm_exec_inst(vm, &vm->program[vm->ip]);[m
+[32m+[m[32m    vm_dump_stack(vm);[m
+[32m+[m[32m    if (e != ERR_OK) {[m
+[32m+[m[32m      printf("ERROR: %s\n", err_to_cstr(e));[m
+[32m+[m[32m      exit(1);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mstatic struct inst program_in_mem[] = {[m
+   { .kind = INST_KIND_PUSH, .value = 69 },[m
+   { .kind = INST_KIND_PUSH, .value = 420 },[m
+   { .kind = INST_KIND_ADD },[m
+[36m@@ -159,20 +189,10 @@[m [mint main(void)[m
+ {[m
+   static struct vm vm = {0};[m
+ [m
+[31m-  int sz = sizeof(program) / sizeof(program[0]);[m
+[31m-  for (size_t i = 0; i < sz; ++i) {[m
+[31m-    assert(i < VM_PROGRAM_CAP);[m
+[31m-    vm.program[vm.program_size++] = program[i];[m
+[31m-  }[m
+[32m+[m[32m  size_t size = sizeof(program_in_mem) / sizeof(program_in_mem[0]);[m
+[32m+[m[32m  vm_load_program_from_memory(&vm, program_in_mem, size);[m
+ [m
+[31m-  while (!vm.halt) {[m
+[31m-    enum err e = vm_exec_inst(&vm, &vm.program[vm.ip]);[m
+[31m-    vm_dump_stack(&vm);[m
+[31m-    if (e != ERR_OK) {[m
+[31m-      printf("ERROR: %s\n", err_to_cstr(e));[m
+[31m-      exit(1);[m
+[31m-    }[m
+[31m-  }[m
+[32m+[m[32m  vm_exec_program(&vm);[m
+ [m
+   return 0;[m
+ }[m
