@@ -21,20 +21,11 @@ char *
 err_to_cstr(enum err e)
 {
   switch (e) {
-  case ERR_STACK_OVERFLOW:
-    return "ERR_STACK_OVERFLOW";
-
-  case ERR_STACK_UNDERFLOW:
-    return "ERR_STACK_UNDERFLOW";
-
-  case ERR_MEM_OUT_OF_RANGE:
-    return "ERR_MEM_OUT_OF_RANGE";
-
-  case ERR_DIV_BY_ZERO:
-    return "ERR_DIV_BY_ZERO";
-
-  case ERR_OK:
-    return "ERR_OK";
+  case ERR_STACK_OVERFLOW: return "ERR_STACK_OVERFLOW";
+  case ERR_STACK_UNDERFLOW: return "ERR_STACK_UNDERFLOW";
+  case ERR_MEM_OUT_OF_RANGE: return "ERR_MEM_OUT_OF_RANGE";
+  case ERR_DIV_BY_ZERO: return "ERR_DIV_BY_ZERO";
+  case ERR_OK: return "ERR_OK";
 
   default: assert(0 && "Unreachable");
   }
@@ -50,6 +41,23 @@ enum inst_kind {
   INST_KIND_JMP_IF,
   INST_KIND_HALT
 };
+
+char *
+inst_kind_to_cstr(enum inst_kind kind)
+{
+  switch (kind) {
+  case INST_KIND_PUSH: return "INST_KIND_PUSH";
+  case INST_KIND_ADD: return "INST_KIND_ADD";
+  case INST_KIND_SUB: return "INST_KIND_SUB";
+  case INST_KIND_MUL: return "INST_KIND_MUL";
+  case INST_KIND_DIV: return "INST_KIND_DIV";
+  case INST_KIND_JMP: return "INST_KIND_JMP";
+  case INST_KIND_JMP_IF: return "INST_KIND_JMP_IF";
+  case INST_KIND_HALT: return "INST_KIND_HALT";
+
+  default: assert(0 && "Unreachable");
+  }
+}
 
 struct inst {
   enum inst_kind kind;
@@ -157,6 +165,16 @@ vm_dump_stack(struct vm *vm)
 }
 
 void
+vm_dump_program(struct vm *vm)
+{
+  printf("Program:\n");
+  for (size_t i = 0; i < vm->program_size; ++i) {
+    struct inst inst = vm->program[i];
+    printf("  %s %i\n", inst_kind_to_cstr(inst.kind), inst.value);
+  }
+}
+
+void
 vm_load_program_from_file(struct vm *vm, char *file_path)
 {
   FILE *f = fopen(file_path, "r");
@@ -199,6 +217,8 @@ vm_load_program_from_file(struct vm *vm, char *file_path)
       vm->program[vm->program_size++] = (struct inst) {
         .kind = INST_KIND_HALT,
       };
+    } else if (strcmp(inst, ";;") == 0) {
+      // @NOTE(art): comment
     } else {
       fprintf(stderr, "Unknown instruction %s\n", inst);
       exit(1);
@@ -232,6 +252,8 @@ int main(int argc, char **argv)
 
   char *in_file = argv[1];
   vm_load_program_from_file(&vm, in_file);
+
+  vm_dump_program(&vm);
 
   vm_exec_program(&vm);
 
