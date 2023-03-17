@@ -1,6 +1,0 @@
-;; this is a comment
-
-push 5
-push 2
-add
-halt
