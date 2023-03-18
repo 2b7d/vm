@@ -8,7 +8,7 @@ enum {
     STACK_CAP = 1 << 7
 };
 
-enum op_code {
+enum opcode {
     OP_ADD,
     OP_SUB,
     OP_LIT,
@@ -67,28 +67,48 @@ uint16_t pop()
     return *--dp;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    FILE *in;
     size_t i = 0;
     int halt = 0;
 
+    argc--;
+    argv++;
+
+    if (argc < 1) {
+        printf("binary file is required\n");
+        return 1;
+    }
+
     dp = data_stack;
     rp = ret_stack;
-    pc = memory + i;
+    pc = memory;
 
-    memory[i++] = OP_LIT;
-    memory[i++] = 3;
-    memory[i++] = OP_LIT;
-    memory[i++] = 2;
+    in = fopen(*argv, "r");
 
-    memory[i++] = OP_LIT;
-    memory[i++] = 1;
-    memory[i++] = OP_JMP;
-    memory[i++] = 9;
+    for (;;) {
+        fread(memory + i, sizeof(uint16_t), 1, in);
+        i++;
+        if (feof(in) != 0) {
+            break;
+        }
+    }
+    //pc = memory + i;
 
-    memory[i++] = OP_ADD;
+    //memory[i++] = OP_LIT;
+    //memory[i++] = 3;
+    //memory[i++] = OP_LIT;
+    //memory[i++] = 2;
 
-    memory[i++] = OP_HALT;
+    //memory[i++] = OP_LIT;
+    //memory[i++] = 1;
+    //memory[i++] = OP_JMP;
+    //memory[i++] = 9;
+
+    //memory[i++] = OP_ADD;
+
+    //memory[i++] = OP_HALT;
 
     print_stack(memory, memory + i, "memory");
     print_stack(data_stack, dp, "data stack");
