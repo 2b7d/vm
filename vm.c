@@ -14,15 +14,13 @@ enum op_code {
     OP_LIT,
     OP_ST,
     OP_LD,
-    OP_HALT,
+    OP_JMP,
+    OP_HALT
 };
 
 uint16_t memory[MEMORY_CAP];
 uint16_t data_stack[STACK_CAP];
 uint16_t ret_stack[STACK_CAP];
-
-uint16_t tos;
-uint16_t mar;
 
 uint16_t *dp;
 uint16_t *rp;
@@ -71,41 +69,32 @@ uint16_t pop()
 
 int main(void)
 {
-    size_t i = 2;
-    int exit = 0;
+    size_t i = 0;
+    int halt = 0;
 
     dp = data_stack;
     rp = ret_stack;
     pc = memory + i;
 
     memory[i++] = OP_LIT;
-    memory[i++] = 0x69;
+    memory[i++] = 3;
     memory[i++] = OP_LIT;
-    memory[i++] = 0x0;
-    memory[i++] = OP_ST;
+    memory[i++] = 2;
 
     memory[i++] = OP_LIT;
-    memory[i++] = 0x420;
-    memory[i++] = OP_LIT;
-    memory[i++] = 0x1;
-    memory[i++] = OP_ST;
-
-    memory[i++] = OP_LIT;
-    memory[i++] = 0x0;
-    memory[i++] = OP_LD;
-
-    memory[i++] = OP_LIT;
-    memory[i++] = 0x1;
-    memory[i++] = OP_LD;
+    memory[i++] = 1;
+    memory[i++] = OP_JMP;
+    memory[i++] = 9;
 
     memory[i++] = OP_ADD;
+
     memory[i++] = OP_HALT;
 
-    print_stack(memory, memory+i, "memory");
+    print_stack(memory, memory + i, "memory");
     print_stack(data_stack, dp, "data stack");
     printf("\n");
-    while (exit == 0) {
-        uint16_t a;
+    while (halt == 0) {
+        uint16_t a, b;
         uint8_t op = *pc++ & 0xff;
 
         switch (op) {
@@ -134,12 +123,24 @@ int main(void)
             push(memory[a]);
             break;
 
-        case OP_HALT:
-            exit = 1;
+        case OP_JMP:
+            a = pop();
+            b = *pc++;
+            if (a == 1) {
+                pc = memory + b;
+            }
             break;
+
+        case OP_HALT:
+            halt = 1;
+            break;
+
+        default:
+            printf("ERROR: unknown opcode %d\n", op);
+            exit(1);
         }
 
-        print_stack(memory, memory+i, "memory");
+        print_stack(memory, memory + i, "memory");
         print_stack(data_stack, dp, "data stack");
         printf("\n");
     }
