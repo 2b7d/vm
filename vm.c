@@ -3,19 +3,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "vm.h"
+
 enum {
     MEMORY_CAP = 1 << 15,
     STACK_CAP = 1 << 7
-};
-
-enum opcode {
-    OP_ADD,
-    OP_SUB,
-    OP_LIT,
-    OP_ST,
-    OP_LD,
-    OP_JMP,
-    OP_HALT
 };
 
 uint16_t memory[MEMORY_CAP];

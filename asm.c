@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <assert.h>
 
+#include "vm.h"
+
 struct scanner {
     size_t cur;
     size_t start;
@@ -15,18 +17,8 @@ struct scanner {
     size_t srclen;
 };
 
-enum opcode_kind {
-    OP_ADD,
-    OP_SUB,
-    OP_LIT,
-    OP_ST,
-    OP_LD,
-    OP_JMP,
-    OP_HALT
-};
-
-struct opcode {
-    enum opcode_kind kind;
+struct token {
+    enum opcode kind;
     uint16_t value;
     int imm;
 };
@@ -93,22 +85,32 @@ int next(struct scanner *s, char c)
     return peek(s) == c;
 }
 
-int compare(struct scanner *s, char *word)
+size_t token_len(struct scanner *s)
 {
-    size_t len = s->cur - s->start;
+    return s->cur - s->start;
+}
+
+char *token_start(struct scanner *s)
+{
+    return s->src + s->start;
+}
+
+int compare_token(struct scanner *s, char *word)
+{
+    size_t len = token_len(s);
 
     if (strlen(word) != len) {
         return 0;
     }
 
-    if (strncmp(s->src + s->start, word, len) == 0) {
+    if (strncmp(token_start(s), word, len) == 0) {
         return 1;
     }
 
     return 0;
 }
 
-int scan(struct scanner *s, struct opcode *op)
+int scan(struct scanner *s, struct token *tok)
 {
     char c;
 
@@ -141,34 +143,39 @@ int scan(struct scanner *s, struct opcode *op)
                     advance(s);
                 }
 
-                if (compare(s, "push") == 1) {
-                    op->kind = OP_LIT;
-                } else if (compare(s, "add") == 1) {
-                    op->kind = OP_ADD;
-                } else if (compare(s, "halt") == 1) {
-                    op->kind = OP_HALT;
-                }else {
-                    printf("ERROR: unknown word `%.*s`\n", (int)(s->cur - s->start), s->src + s->start);
+                if (compare_token(s, "push") == 1) {
+                    tok->kind = OP_LIT;
+                } else if (compare_token(s, "add") == 1) {
+                    tok->kind = OP_ADD;
+                } else if (compare_token(s, "halt") == 1) {
+                    tok->kind = OP_HALT;
+                } else {
+                    printf("ERROR: unknown word `%.*s`\n",
+                           (int) token_len(s),
+                           token_start(s));
                     return 0;
                 }
+
                 return 1;
-            } else if (isdigit(c) != 0) {
+            }
+
+            if (isdigit(c) != 0) {
                 char val[6];
 
                 while(isdigit(peek(s)) != 0) {
                     advance(s);
                 }
 
-                assert(s->cur - s->start < 6);
+                assert(token_len(s) < 6);
                 memset(val, 0, sizeof(val));
-                memcpy(val, s->src + s->start, s->cur - s->start);
-                op->imm = 1;
-                op->value = atoi(val);
+                memcpy(val, token_start(s), token_len(s));
+                tok->imm = 1;
+                tok->value = atoi(val);
                 return 1;
-            } else {
-                printf("ERROR: unknown character `%c`\n", c);
-                return 0;
             }
+
+            printf("ERROR: unknown character `%c`\n", c);
+            return 0;
         }
     }
 }
@@ -177,7 +184,7 @@ int main(int argc, char **argv)
 {
     char *src;
     struct scanner s;
-    struct opcode op;
+    struct token tok;
     FILE *out;
 
     argc--;
@@ -198,15 +205,15 @@ int main(int argc, char **argv)
     s.start = 0;
 
     for (;;) {
-        memset(&op, 0, sizeof(struct opcode));
-        if (scan(&s, &op) == 0) {
+        memset(&tok, 0, sizeof(struct token));
+        if (scan(&s, &tok) == 0) {
             break;
         }
 
-        if (op.imm == 1) {
-            fwrite(&op.value, sizeof(uint16_t), 1, out);
+        if (tok.imm == 1) {
+            fwrite(&tok.value, sizeof(uint16_t), 1, out);
         } else {
-            fwrite(&op.kind, sizeof(uint16_t), 1, out);
+            fwrite(&tok.kind, sizeof(uint16_t), 1, out);
         }
     }
 
