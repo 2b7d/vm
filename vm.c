@@ -6,31 +6,26 @@
 #include "vm.h"
 
 enum {
-    MEMORY_CAP = 1 << 15,
+    RAM_CAP = 1 << 15,
     STACK_CAP = 1 << 7
 };
 
-uint16_t memory[MEMORY_CAP];
-uint16_t data_stack[STACK_CAP];
-uint16_t ret_stack[STACK_CAP];
+uint16_t ram[RAM_CAP];
+uint16_t stack[STACK_CAP];
+uint16_t retstack[STACK_CAP];
 
-uint16_t *dp;
-uint16_t *rp;
-uint16_t *pc;
+uint16_t pc;
+uint16_t sp;
+uint16_t rsp;
 
-uint16_t ptrdiff(uint16_t *begin, uint16_t *end)
-{
-    return end - begin;
-}
-
-void print_stack(uint16_t *stack, uint16_t *sp, char *label)
+void print_memory(uint16_t *mem, uint16_t size, char *label)
 {
     uint16_t i;
 
-    printf("%-10s: {", label);
-    for (i = 0; i < sp - stack ; ++i) {
-        printf("0x%x", stack[i]);
-        if (i != ptrdiff(stack, sp) - 1) {
+    printf("%-8s {", label);
+    for (i = 0; i < size ; ++i) {
+        printf("%u", mem[i]);
+        if (i != size - 1) {
             printf(", ");
         }
     }
@@ -40,29 +35,75 @@ void print_stack(uint16_t *stack, uint16_t *sp, char *label)
 void push(uint16_t val)
 {
     // TODO: proper error handling
-    if (ptrdiff(data_stack, dp) >= STACK_CAP) {
+    if (sp >= STACK_CAP) {
         printf("ERROR: stack overflow\n");
         exit(1);
     }
 
-    *dp++ = val;
+    stack[sp++] = val;
 }
 
 uint16_t pop()
 {
     // TODO: proper error handling
-    if (ptrdiff(data_stack, dp) < 1) {
+    if (sp < 1) {
         printf("ERROR: stack underflow\n");
         exit(1);
     }
 
-    return *--dp;
+    return stack[--sp];
+}
+
+uint16_t ramload(uint16_t addr)
+{
+    if (addr >= RAM_CAP) {
+        printf("ERROR: address(0x%04x) is out of bound\n", addr);
+        exit(1);
+    }
+
+    return ram[addr];
+}
+
+void ramstore(uint16_t addr, uint16_t val)
+{
+    if (addr >= RAM_CAP) {
+        printf("ERROR: address(0x%04x) is out of bound\n", addr);
+        exit(1);
+    }
+
+    ram[addr] = val;
+}
+
+void load_program(char *pathname)
+{
+    FILE *f;
+    size_t i = 0;
+
+    f = fopen(pathname, "r");
+    if (f == NULL) {
+        printf("ERROR: failed to open binary file\n");
+        exit(1);
+    }
+
+    for (;;) {
+        fread(ram + i, sizeof(uint16_t), 1, f);
+        i++;
+
+        if (ferror(f) != 0) {
+            printf("ERROR: failed to read binary file\n");
+            exit(1);
+        }
+
+        if (feof(f) != 0) {
+            break;
+        }
+    }
+
+    fclose(f);
 }
 
 int main(int argc, char **argv)
 {
-    FILE *in;
-    size_t i = 0;
     int halt = 0;
 
     argc--;
@@ -73,41 +114,18 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    dp = data_stack;
-    rp = ret_stack;
-    pc = memory;
+    pc = 0;
+    sp = 0;
+    rsp = 0;
 
-    in = fopen(*argv, "r");
+    load_program(*argv);
 
-    for (;;) {
-        fread(memory + i, sizeof(uint16_t), 1, in);
-        i++;
-        if (feof(in) != 0) {
-            break;
-        }
-    }
-    //pc = memory + i;
+    print_memory(ram, 20, "RAM");
+    print_memory(stack, sp, "stack");
 
-    //memory[i++] = OP_LIT;
-    //memory[i++] = 3;
-    //memory[i++] = OP_LIT;
-    //memory[i++] = 2;
-
-    //memory[i++] = OP_LIT;
-    //memory[i++] = 1;
-    //memory[i++] = OP_JMP;
-    //memory[i++] = 9;
-
-    //memory[i++] = OP_ADD;
-
-    //memory[i++] = OP_HALT;
-
-    print_stack(memory, memory + i, "memory");
-    print_stack(data_stack, dp, "data stack");
-    printf("\n");
     while (halt == 0) {
-        uint16_t a, b;
-        uint8_t op = *pc++ & 0xff;
+        uint16_t a;
+        uint8_t op = ramload(pc++) & 0xff;
 
         switch (op) {
         case OP_ADD:
@@ -120,27 +138,25 @@ int main(int argc, char **argv)
             break;
 
         case OP_LIT:
-            push(*pc++);
+            push(ramload(pc++));
             break;
 
         case OP_ST:
-            // TODO: validate address
-            a = pop();
-            memory[a] = pop();
+            ramstore(pop(), pop());
             break;
 
         case OP_LD:
-            // TODO: validate address
-            a = pop();
-            push(memory[a]);
+            push(ramload(pop()));
             break;
 
         case OP_JMP:
-            a = pop();
-            b = *pc++;
-            if (a == 1) {
-                pc = memory + b;
+            a = ramload(pc++);
+            if (pop() == 1) {
+                pc = a;
             }
+            break;
+
+        case OP_NOP:
             break;
 
         case OP_HALT:
@@ -148,15 +164,12 @@ int main(int argc, char **argv)
             break;
 
         default:
-            printf("ERROR: unknown opcode %d\n", op);
+            printf("ERROR: unknown vm_opcode(%u)\n", op);
             exit(1);
         }
 
-        print_stack(memory, memory + i, "memory");
-        print_stack(data_stack, dp, "data stack");
-        printf("\n");
+        print_memory(stack, sp, "stack");
     }
-
 
     return 0;
 }
