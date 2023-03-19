@@ -248,7 +248,9 @@ int main(int argc, char **argv)
     s.cur = 0;
     s.start = 0;
 
-    meminit(&toks, sizeof(struct token), 64);
+    if (meminit(&toks, sizeof(struct token), 64) == 0) {
+        return 1;
+    }
 
     if (scan(&s, &toks) == 0) {
         return 1;
