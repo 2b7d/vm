@@ -134,6 +134,7 @@ int scan(struct scanner *s, struct opcode *op)
                 while (next(s, '\n') == 0 && has_src(s) == 1) {
                     advance(s);
                 }
+                break;
             }
             printf("ERROR: unknown character `%c`\n", c);
             return 0;
