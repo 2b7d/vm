@@ -149,6 +149,12 @@ int main(int argc, char **argv)
             push(pop() - a);
             break;
 
+        case OP_DUP:
+            a = pop();
+            push(a);
+            push(a);
+            break;
+
         case OP_EQ:
             push(pop() == pop());
             break;
@@ -176,7 +182,7 @@ int main(int argc, char **argv)
             break;
 
         case OP_JMP:
-            pc = ramload(pc++);
+            pc = ramload(pc);
             break;
 
         case OP_IFJMP:

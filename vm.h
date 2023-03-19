@@ -7,6 +7,8 @@ enum vm_opcode {
     OP_ADD,
     OP_SUB,
 
+    OP_DUP,
+
     OP_EQ,
     OP_GT,
     OP_LT,
