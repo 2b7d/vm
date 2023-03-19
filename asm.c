@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "vm.h"
+#include "mem.h"
 
 struct scanner {
     size_t cur;
@@ -17,10 +18,22 @@ struct scanner {
     size_t srclen;
 };
 
-struct opcode {
-    enum vm_opcode kind;
-    uint16_t value;
-    int imm;
+enum token_kind {
+    TOKEN_OPCODE,
+    TOKEN_IMMEDIATE,
+    TOKEN_LABEL
+};
+
+struct token {
+    enum vm_opcode opcode;
+    enum token_kind kind;
+    uint16_t literal;
+};
+
+struct tokens {
+    size_t size;
+    size_t cap;
+    struct token *buf;
 };
 
 char *read_file(char *pathname)
@@ -62,11 +75,6 @@ int has_src(struct scanner *s)
     return s->cur < s->srclen;
 }
 
-char advance(struct scanner *s)
-{
-    return s->src[s->cur++];
-}
-
 char peek(struct scanner *s)
 {
     if (has_src(s) == 0) {
@@ -76,48 +84,59 @@ char peek(struct scanner *s)
     return s->src[s->cur];
 }
 
-int next(struct scanner *s, char c)
+char advance(struct scanner *s)
 {
-    if (has_src(s) == 0) {
-        return 0;
+    char c = peek(s);
+
+    if (c != '\0') {
+        s->cur++;
     }
 
+    return c;
+}
+
+int next(struct scanner *s, char c)
+{
     return peek(s) == c;
 }
 
-size_t token_len(struct scanner *s)
+size_t lexeme_len(struct scanner *s)
 {
     return s->cur - s->start;
 }
 
-char *token_start(struct scanner *s)
+char *lexeme_start(struct scanner *s)
 {
     return s->src + s->start;
 }
 
-int compare_token(struct scanner *s, char *word)
+int compare_lexeme(struct scanner *s, char *word)
 {
-    size_t len = token_len(s);
+    size_t len = lexeme_len(s);
 
     if (strlen(word) != len) {
         return 0;
     }
 
-    if (strncmp(token_start(s), word, len) == 0) {
+    if (strncmp(lexeme_start(s), word, len) == 0) {
         return 1;
     }
 
     return 0;
 }
 
-int scan(struct scanner *s, struct opcode *op)
+int scan(struct scanner *s, struct tokens *toks)
 {
     char c;
+    struct token *t;
 
     for (;;) {
         if (has_src(s) == 0) {
-            return 0;
+            return 1;
         }
+
+        memgrow(toks, sizeof(struct token));
+        t = toks->buf + toks->size;
 
         s->start = s->cur;
         c = advance(s);
@@ -129,15 +148,11 @@ int scan(struct scanner *s, struct opcode *op)
         case '\n':
             break;
 
-        case '/':
-            if (next(s, '/') == 1) {
-                while (next(s, '\n') == 0 && has_src(s) == 1) {
-                    advance(s);
-                }
-                break;
+        case ';':
+            while (next(s, '\n') == 0 && has_src(s) == 1) {
+                advance(s);
             }
-            printf("ERROR: unknown character `%c`\n", c);
-            return 0;
+            break;
 
         default:
             if (isalpha(c) != 0) {
@@ -145,30 +160,44 @@ int scan(struct scanner *s, struct opcode *op)
                     advance(s);
                 }
 
-                if (compare_token(s, "add") == 1) {
-                    op->kind = OP_ADD;
-                } else if (compare_token(s, "sub") == 1) {
-                    op->kind = OP_SUB;
-                } else if (compare_token(s, "push") == 1) {
-                    op->kind = OP_LIT;
-                } else if (compare_token(s, "st") == 1) {
-                    op->kind = OP_ST;
-                } else if (compare_token(s, "ld") == 1) {
-                    op->kind = OP_LD;
-                } else if (compare_token(s, "jmp") == 1) {
-                    op->kind = OP_JMP;
-                } else if (compare_token(s, "halt") == 1) {
-                    op->kind = OP_HALT;
-                } else if (compare_token(s, "nop") == 1) {
-                    op->kind = OP_NOP;
+                if (compare_lexeme(s, "st") == 1) {
+                    t->opcode = OP_ST;
+                } else if (compare_lexeme(s, "ld") == 1) {
+                    t->opcode = OP_LD;
+                } else if (compare_lexeme(s, "push") == 1) {
+                    t->opcode = OP_LIT;
+                } else if (compare_lexeme(s, "add") == 1) {
+                    t->opcode = OP_ADD;
+                } else if (compare_lexeme(s, "sub") == 1) {
+                    t->opcode = OP_SUB;
+                } else if (compare_lexeme(s, "eq") == 1) {
+                    t->opcode = OP_EQ;
+                } else if (compare_lexeme(s, "gt") == 1) {
+                    t->opcode = OP_GT;
+                } else if (compare_lexeme(s, "lt") == 1) {
+                    t->opcode = OP_LT;
+                } else if (compare_lexeme(s, "or") == 1) {
+                    t->opcode = OP_OR;
+                } else if (compare_lexeme(s, "and") == 1) {
+                    t->opcode = OP_AND;
+                } else if (compare_lexeme(s, "not") == 1) {
+                    t->opcode = OP_NOT;
+                } else if (compare_lexeme(s, "jmp") == 1) {
+                    t->opcode = OP_JMP;
+                } else if (compare_lexeme(s, "ifjmp") == 1) {
+                    t->opcode = OP_IFJMP;
+                } else if (compare_lexeme(s, "halt") == 1) {
+                    t->opcode = OP_HALT;
                 } else {
                     printf("ERROR: unknown word `%.*s`\n",
-                           (int) token_len(s),
-                           token_start(s));
+                           (int) lexeme_len(s),
+                           lexeme_start(s));
                     return 0;
                 }
 
-                return 1;
+                t->kind = TOKEN_OPCODE;
+                toks->size++;
+                break;
             }
 
             if (isdigit(c) != 0) {
@@ -178,12 +207,13 @@ int scan(struct scanner *s, struct opcode *op)
                     advance(s);
                 }
 
-                assert(token_len(s) < 6);
+                assert(lexeme_len(s) < 6);
                 memset(val, 0, sizeof(val));
-                memcpy(val, token_start(s), token_len(s));
-                op->imm = 1;
-                op->value = atoi(val);
-                return 1;
+                memcpy(val, lexeme_start(s), lexeme_len(s));
+                t->kind = TOKEN_IMMEDIATE;
+                t->literal = atoi(val);
+                toks->size++;
+                break;
             }
 
             printf("ERROR: unknown character `%c`\n", c);
@@ -194,9 +224,8 @@ int scan(struct scanner *s, struct opcode *op)
 
 int main(int argc, char **argv)
 {
-    char *src;
     struct scanner s;
-    struct opcode op;
+    struct tokens toks;
     FILE *out;
 
     argc--;
@@ -207,28 +236,37 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // TODO: unhardcode outfile name
     out = fopen("a.out", "w");
-    assert(out != NULL);
+    if (out == NULL) {
+        printf("failed to open out file\n");
+        return 1;
+    }
 
-    src = read_file(*argv);
-    s.src = src;
-    s.srclen = strlen(src);
+    s.src = read_file(*argv);
+    s.srclen = strlen(s.src);
     s.cur = 0;
     s.start = 0;
 
-    for (;;) {
-        memset(&op, 0, sizeof(struct opcode));
-        if (scan(&s, &op) == 0) {
-            break;
-        }
+    meminit(&toks, sizeof(struct token), 64);
 
-        if (op.imm == 1) {
-            fwrite(&op.value, sizeof(uint16_t), 1, out);
-        } else {
-            fwrite(&op.kind, sizeof(uint16_t), 1, out);
-        }
+    if (scan(&s, &toks) == 0) {
+        return 1;
     }
 
+    for (size_t i = 0; i < toks.size; ++i) {
+        struct token *t = toks.buf + i;
+        uint16_t val = t->opcode;
+
+        if (t->kind == TOKEN_IMMEDIATE) {
+            val = t->literal;
+        }
+
+        fwrite(&val, sizeof(uint16_t), 1, out);
+    }
+
+    memfree(&toks);
+    free(s.src);
     fclose(out);
     return 0;
 }
