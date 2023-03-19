@@ -17,8 +17,8 @@ struct scanner {
     size_t srclen;
 };
 
-struct token {
-    enum opcode kind;
+struct opcode {
+    enum vm_opcode kind;
     uint16_t value;
     int imm;
 };
@@ -110,7 +110,7 @@ int compare_token(struct scanner *s, char *word)
     return 0;
 }
 
-int scan(struct scanner *s, struct token *tok)
+int scan(struct scanner *s, struct opcode *op)
 {
     char c;
 
@@ -135,7 +135,8 @@ int scan(struct scanner *s, struct token *tok)
                     advance(s);
                 }
             }
-            break;
+            printf("ERROR: unknown character `%c`\n", c);
+            return 0;
 
         default:
             if (isalpha(c) != 0) {
@@ -143,12 +144,22 @@ int scan(struct scanner *s, struct token *tok)
                     advance(s);
                 }
 
-                if (compare_token(s, "push") == 1) {
-                    tok->kind = OP_LIT;
-                } else if (compare_token(s, "add") == 1) {
-                    tok->kind = OP_ADD;
+                if (compare_token(s, "add") == 1) {
+                    op->kind = OP_ADD;
+                } else if (compare_token(s, "sub") == 1) {
+                    op->kind = OP_SUB;
+                } else if (compare_token(s, "push") == 1) {
+                    op->kind = OP_LIT;
+                } else if (compare_token(s, "st") == 1) {
+                    op->kind = OP_ST;
+                } else if (compare_token(s, "ld") == 1) {
+                    op->kind = OP_LD;
+                } else if (compare_token(s, "jmp") == 1) {
+                    op->kind = OP_JMP;
                 } else if (compare_token(s, "halt") == 1) {
-                    tok->kind = OP_HALT;
+                    op->kind = OP_HALT;
+                } else if (compare_token(s, "nop") == 1) {
+                    op->kind = OP_NOP;
                 } else {
                     printf("ERROR: unknown word `%.*s`\n",
                            (int) token_len(s),
@@ -169,8 +180,8 @@ int scan(struct scanner *s, struct token *tok)
                 assert(token_len(s) < 6);
                 memset(val, 0, sizeof(val));
                 memcpy(val, token_start(s), token_len(s));
-                tok->imm = 1;
-                tok->value = atoi(val);
+                op->imm = 1;
+                op->value = atoi(val);
                 return 1;
             }
 
@@ -184,7 +195,7 @@ int main(int argc, char **argv)
 {
     char *src;
     struct scanner s;
-    struct token tok;
+    struct opcode op;
     FILE *out;
 
     argc--;
@@ -205,15 +216,15 @@ int main(int argc, char **argv)
     s.start = 0;
 
     for (;;) {
-        memset(&tok, 0, sizeof(struct token));
-        if (scan(&s, &tok) == 0) {
+        memset(&op, 0, sizeof(struct opcode));
+        if (scan(&s, &op) == 0) {
             break;
         }
 
-        if (tok.imm == 1) {
-            fwrite(&tok.value, sizeof(uint16_t), 1, out);
+        if (op.imm == 1) {
+            fwrite(&op.value, sizeof(uint16_t), 1, out);
         } else {
-            fwrite(&tok.kind, sizeof(uint16_t), 1, out);
+            fwrite(&op.kind, sizeof(uint16_t), 1, out);
         }
     }
 
