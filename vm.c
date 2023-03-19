@@ -128,6 +128,18 @@ int main(int argc, char **argv)
         uint8_t op = ramload(pc++) & 0xff;
 
         switch (op) {
+        case OP_ST:
+            ramstore(pop(), pop());
+            break;
+
+        case OP_LD:
+            push(ramload(pop()));
+            break;
+
+        case OP_LIT:
+            push(ramload(pc++));
+            break;
+
         case OP_ADD:
             push(pop() + pop());
             break;
@@ -137,26 +149,41 @@ int main(int argc, char **argv)
             push(pop() - a);
             break;
 
-        case OP_LIT:
-            push(ramload(pc++));
+        case OP_EQ:
+            push(pop() == pop());
             break;
 
-        case OP_ST:
-            ramstore(pop(), pop());
+        case OP_GT:
+            a = pop();
+            push(pop() > a);
             break;
 
-        case OP_LD:
-            push(ramload(pop()));
+        case OP_LT:
+            a = pop();
+            push(pop() < a);
+            break;
+
+        case OP_OR:
+            push(pop() || pop());
+            break;
+
+        case OP_AND:
+            push(pop() && pop());
+            break;
+
+        case OP_NOT:
+            push(!pop());
             break;
 
         case OP_JMP:
+            pc = ramload(pc++);
+            break;
+
+        case OP_IFJMP:
             a = ramload(pc++);
             if (pop() == 1) {
                 pc = a;
             }
-            break;
-
-        case OP_NOP:
             break;
 
         case OP_HALT:
