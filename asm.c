@@ -27,13 +27,27 @@ enum token_kind {
 struct token {
     enum vm_opcode opcode;
     enum token_kind kind;
-    uint16_t literal;
+    uint16_t value;
+    char *lexeme;
+    size_t lexemelen;
 };
 
 struct tokens {
     size_t size;
     size_t cap;
     struct token *buf;
+};
+
+struct label {
+    size_t addr;
+    char *start;
+    size_t len;
+};
+
+struct labels {
+    size_t size;
+    size_t cap;
+    struct label *buf;
 };
 
 char *read_file(char *pathname)
@@ -125,7 +139,7 @@ int compare_lexeme(struct scanner *s, char *word)
     return 0;
 }
 
-int scan(struct scanner *s, struct tokens *toks)
+int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
 {
     char c;
     struct token *t;
@@ -155,10 +169,26 @@ int scan(struct scanner *s, struct tokens *toks)
             break;
 
         default:
-            if (isalpha(c) != 0) {
-                while(isalpha(peek(s)) != 0) {
+            if (isalpha(c) != 0 || c == '_') {
+                advance(s);
+                while(isalnum(peek(s)) != 0) {
                     advance(s);
                 }
+
+                if (peek(s) == ':') {
+                    struct label *l;
+
+                    memgrow(ls, sizeof(struct label));
+                    l = ls->buf + ls->size;
+                    l->addr = toks->size;
+                    l->start = lexeme_start(s);
+                    l->len = lexeme_len(s);
+                    ls->size++;
+                    advance(s);
+                    break;
+                }
+
+                t->kind = TOKEN_OPCODE;
 
                 if (compare_lexeme(s, "st") == 1) {
                     t->opcode = OP_ST;
@@ -170,6 +200,8 @@ int scan(struct scanner *s, struct tokens *toks)
                     t->opcode = OP_ADD;
                 } else if (compare_lexeme(s, "sub") == 1) {
                     t->opcode = OP_SUB;
+                } else if (compare_lexeme(s, "dup") == 1) {
+                    t->opcode = OP_DUP;
                 } else if (compare_lexeme(s, "eq") == 1) {
                     t->opcode = OP_EQ;
                 } else if (compare_lexeme(s, "gt") == 1) {
@@ -189,13 +221,11 @@ int scan(struct scanner *s, struct tokens *toks)
                 } else if (compare_lexeme(s, "halt") == 1) {
                     t->opcode = OP_HALT;
                 } else {
-                    printf("ERROR: unknown word `%.*s`\n",
-                           (int) lexeme_len(s),
-                           lexeme_start(s));
-                    return 0;
+                    t->kind = TOKEN_LABEL;
+                    t->lexeme = lexeme_start(s);
+                    t->lexemelen = lexeme_len(s);
                 }
 
-                t->kind = TOKEN_OPCODE;
                 toks->size++;
                 break;
             }
@@ -211,7 +241,7 @@ int scan(struct scanner *s, struct tokens *toks)
                 memset(val, 0, sizeof(val));
                 memcpy(val, lexeme_start(s), lexeme_len(s));
                 t->kind = TOKEN_IMMEDIATE;
-                t->literal = atoi(val);
+                t->value = atoi(val);
                 toks->size++;
                 break;
             }
@@ -226,6 +256,7 @@ int main(int argc, char **argv)
 {
     struct scanner s;
     struct tokens toks;
+    struct labels labels;
     FILE *out;
 
     argc--;
@@ -249,24 +280,59 @@ int main(int argc, char **argv)
     s.start = 0;
 
     if (meminit(&toks, sizeof(struct token), 64) == 0) {
+        printf("failed to initialize tokens array\n");
         return 1;
     }
 
-    if (scan(&s, &toks) == 0) {
+    if (meminit(&labels, sizeof(struct label), 32) == 0) {
+        printf("failed to initialize labels array\n");
         return 1;
+    }
+
+    if (scan(&s, &toks, &labels) == 0) {
+        return 1;
+    }
+
+    for (size_t i = 0; i < toks.size; ++i) {
+        int label_found = 0;
+        struct token *t = toks.buf + i;
+
+        if (t->kind != TOKEN_LABEL) {
+            continue;
+        }
+
+        for (size_t j = 0; j < labels.size; ++j) {
+            struct label *l = labels.buf + j;
+
+            if (t->lexemelen != l->len) {
+                continue;
+            }
+
+            if (memcmp(t->lexeme, l->start, l->len) == 0) {
+                label_found = 1;
+                t->value = l->addr;
+                break;
+            }
+        }
+
+        if (label_found == 0) {
+            printf("Undefined label %.*s\n", (int) t->lexemelen, t->lexeme);
+            return 1;
+        }
     }
 
     for (size_t i = 0; i < toks.size; ++i) {
         struct token *t = toks.buf + i;
         uint16_t val = t->opcode;
 
-        if (t->kind == TOKEN_IMMEDIATE) {
-            val = t->literal;
+        if (t->kind != TOKEN_OPCODE) {
+            val = t->value;
         }
 
         fwrite(&val, sizeof(uint16_t), 1, out);
     }
 
+    memfree(&labels);
     memfree(&toks);
     free(s.src);
     fclose(out);
