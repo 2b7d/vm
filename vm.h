@@ -14,6 +14,8 @@ enum vm_opcode {
 
     OP_DUP,
     OP_OVER,
+    OP_SWAP,
+    OP_DROP,
 
     OP_EQ,
     OP_GT,

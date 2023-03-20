@@ -6,7 +6,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
-#include <assert.h>
 
 #include "vm.h"
 #include "mem.h"
@@ -139,18 +138,14 @@ int compare_lexeme(struct scanner *s, char *word)
     return 0;
 }
 
-int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
+void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
 {
-    char c;
-    struct token *t;
-
     for (;;) {
-        if (has_src(s) == 0) {
-            return 1;
-        }
+        char c;
 
-        memgrow(toks, sizeof(struct token));
-        t = toks->buf + toks->size;
+        if (has_src(s) == 0) {
+            return;
+        }
 
         s->start = s->cur;
         c = advance(s);
@@ -168,8 +163,36 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
             }
             break;
 
+        case '"':
+            while (next(s, '"') == 0 && has_src(s) == 1) {
+                advance(s);
+            }
+
+            if (has_src(s) == 0) {
+                printf("unterminated string\n");
+                exit(1);
+            }
+
+            for (size_t i = 1; i < lexeme_len(s); ++i) {
+                struct token *t;
+                char val = s->src[s->start + i];
+
+                memgrow(toks, sizeof(struct token));
+                t = toks->buf + toks->size;
+
+                t->kind = TOKEN_IMMEDIATE;
+                t->value = val;
+                toks->size++;
+            }
+
+            advance(s);
+            break;
+
+
         default:
             if (isalpha(c) != 0 || c == '_') {
+                struct token *t;
+
                 while(isalnum(peek(s)) != 0 || peek(s) == '_') {
                     advance(s);
                 }
@@ -187,6 +210,8 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     break;
                 }
 
+                memgrow(toks, sizeof(struct token));
+                t = toks->buf + toks->size;
                 t->kind = TOKEN_OPCODE;
 
                 if (compare_lexeme(s, "st") == 1) {
@@ -213,6 +238,10 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_DUP;
                 } else if (compare_lexeme(s, "over") == 1) {
                     t->opcode = OP_OVER;
+                } else if (compare_lexeme(s, "swap") == 1) {
+                    t->opcode = OP_SWAP;
+                } else if (compare_lexeme(s, "drop") == 1) {
+                    t->opcode = OP_DROP;
                 } else if (compare_lexeme(s, "eq") == 1) {
                     t->opcode = OP_EQ;
                 } else if (compare_lexeme(s, "gt") == 1) {
@@ -242,13 +271,23 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
             }
 
             if (isdigit(c) != 0) {
+                struct token *t;
                 char val[6];
+
+                memgrow(toks, sizeof(struct token));
+                t = toks->buf + toks->size;
 
                 while(isdigit(peek(s)) != 0) {
                     advance(s);
                 }
 
-                assert(lexeme_len(s) < 6);
+                if (lexeme_len(s) >= sizeof(val))  {
+                    printf("value(%*.s) is greater than 16bit\n",
+                           (int) lexeme_len(s),
+                           lexeme_start(s));
+                    exit(1);
+                }
+
                 memset(val, 0, sizeof(val));
                 memcpy(val, lexeme_start(s), lexeme_len(s));
                 t->kind = TOKEN_IMMEDIATE;
@@ -258,7 +297,7 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
             }
 
             printf("ERROR: unknown character `%c`\n", c);
-            return 0;
+            exit(1);
         }
     }
 }
@@ -290,31 +329,24 @@ int main(int argc, char **argv)
     s.cur = 0;
     s.start = 0;
 
-    if (meminit(&toks, sizeof(struct token), 64) == 0) {
-        printf("failed to initialize tokens array\n");
-        return 1;
-    }
+    meminit(&toks, sizeof(struct token), 64);
+    meminit(&labels, sizeof(struct label), 32);
 
-    if (meminit(&labels, sizeof(struct label), 32) == 0) {
-        printf("failed to initialize labels array\n");
-        return 1;
-    }
-
-    if (scan(&s, &toks, &labels) == 0) {
-        return 1;
-    }
+    scan(&s, &toks, &labels);
 
     {
         int start_found = 0;
+        char *start = "_start";
+        size_t len = strlen(start);
 
         for (size_t i = 0; i < labels.size; ++i) {
             struct label *l = labels.buf + i;
 
-            if (l->len != 6) {
+            if (l->len != len) {
                 continue;
             }
 
-            if (memcmp(l->start, "_start", 6) == 0) {
+            if (memcmp(l->start, start, len) == 0) {
                 start_found = 1;
                 fwrite(&l->addr, sizeof(uint16_t), 1, out);
                 break;
@@ -366,9 +398,5 @@ int main(int argc, char **argv)
         fwrite(&val, sizeof(uint16_t), 1, out);
     }
 
-    memfree(&labels);
-    memfree(&toks);
-    free(s.src);
-    fclose(out);
     return 0;
 }

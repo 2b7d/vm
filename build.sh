@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xe
+set -e
 
 name="$1"
 flags="-Werror=declaration-after-statement -Wall -Wextra -pedantic -std=c99 -g"

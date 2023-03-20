@@ -189,6 +189,17 @@ int main(int argc, char **argv)
             push(stack[sp - 2]);
             break;
 
+        case OP_SWAP:
+            a = pop();
+            b = pop();
+            push(a);
+            push(b);
+            break;
+
+        case OP_DROP:
+            pop();
+            break;
+
         case OP_EQ:
             push(pop() == pop());
             break;
