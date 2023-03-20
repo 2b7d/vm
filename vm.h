@@ -2,8 +2,6 @@ enum vm_opcode {
     OP_ST,       // n1 addr ->
     OP_LD,       // addr -> n1
 
-    OP_LIT,      // -> n1
-
     OP_ADD,      // n1 n2 -> n3
     OP_SUB,      // n1 n2 -> n3
     OP_MUL,      // n1 n2 -> n3
@@ -12,6 +10,7 @@ enum vm_opcode {
     OP_INC,      // n1 -> n2
     OP_DEC,      // n1 -> n2
 
+    OP_PUSH,     // -> n1
     OP_DUP,      // n1 -> n1 n1
     OP_OVER,     // n1 n2 -> n1 n2 n1
     OP_SWAP,     // n1 n2 -> n2 n1

@@ -219,7 +219,7 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                 } else if (compare_lexeme(s, "ld") == 1) {
                     t->opcode = OP_LD;
                 } else if (compare_lexeme(s, "push") == 1) {
-                    t->opcode = OP_LIT;
+                    t->opcode = OP_PUSH;
                 } else if (compare_lexeme(s, "add") == 1) {
                     t->opcode = OP_ADD;
                 } else if (compare_lexeme(s, "sub") == 1) {

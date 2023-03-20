@@ -159,7 +159,7 @@ int main(int argc, char **argv)
             push(ramload(pop()));
             break;
 
-        case OP_LIT:
+        case OP_PUSH:
             push(ramload(pc++));
             break;
 
