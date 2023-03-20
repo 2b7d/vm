@@ -85,7 +85,14 @@ void load_program(char *pathname)
         exit(1);
     }
 
+    fread(&pc, sizeof(uint16_t), 1, f);
+
     for (;;) {
+        if (i >= RAM_CAP) {
+            printf("ERROR: not enough memory to load program\n");
+            exit(1);
+        }
+
         fread(ram + i, sizeof(uint16_t), 1, f);
         i++;
 
@@ -129,7 +136,8 @@ int main(int argc, char **argv)
 
         switch (op) {
         case OP_ST:
-            ramstore(pop(), pop());
+            a = pop();
+            ramstore(a, pop());
             break;
 
         case OP_LD:
@@ -203,6 +211,9 @@ int main(int argc, char **argv)
 
         print_memory(stack, sp, "stack");
     }
+
+    print_memory(ram, 20, "RAM");
+    print_memory(stack, sp, "stack");
 
     return 0;
 }

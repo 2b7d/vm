@@ -170,7 +170,6 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
 
         default:
             if (isalpha(c) != 0 || c == '_') {
-                advance(s);
                 while(isalnum(peek(s)) != 0) {
                     advance(s);
                 }
@@ -291,6 +290,29 @@ int main(int argc, char **argv)
 
     if (scan(&s, &toks, &labels) == 0) {
         return 1;
+    }
+
+    {
+        int start_found = 0;
+
+        for (size_t i = 0; i < labels.size; ++i) {
+            struct label *l = labels.buf + i;
+
+            if (l->len != 6) {
+                continue;
+            }
+
+            if (memcmp(l->start, "_start", 6) == 0) {
+                start_found = 1;
+                fwrite(&l->addr, sizeof(uint16_t), 1, out);
+                break;
+            }
+        }
+
+        if (start_found == 0) {
+            printf("_start entry point is missing\n");
+            return 1;
+        }
     }
 
     for (size_t i = 0; i < toks.size; ++i) {
