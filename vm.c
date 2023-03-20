@@ -131,7 +131,7 @@ int main(int argc, char **argv)
     print_memory(stack, sp, "stack");
 
     while (halt == 0) {
-        uint16_t a;
+        uint16_t a, b;
         uint8_t op = ramload(pc++) & 0xff;
 
         switch (op) {
@@ -157,10 +157,36 @@ int main(int argc, char **argv)
             push(pop() - a);
             break;
 
-        case OP_DUP:
+        case OP_MUL:
+            push(pop() * pop());
+            break;
+
+        case OP_DIV:
             a = pop();
-            push(a);
-            push(a);
+            push(pop() / a);
+            break;
+
+        case OP_MOD:
+            a = pop();
+            push(pop() % a);
+            break;
+
+        case OP_INC:
+            a = pop();
+            push(a + 1);
+            break;
+
+        case OP_DEC:
+            a = pop();
+            push(a - 1);
+            break;
+
+        case OP_DUP:
+            push(stack[sp - 1]);
+            break;
+
+        case OP_OVER:
+            push(stack[sp - 2]);
             break;
 
         case OP_EQ:
@@ -178,11 +204,15 @@ int main(int argc, char **argv)
             break;
 
         case OP_OR:
-            push(pop() || pop());
+            a = pop();
+            b = pop();
+            push(a || b);
             break;
 
         case OP_AND:
-            push(pop() && pop());
+            a = pop();
+            b = pop();
+            push(a && b);
             break;
 
         case OP_NOT:

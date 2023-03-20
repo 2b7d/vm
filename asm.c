@@ -170,7 +170,7 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
 
         default:
             if (isalpha(c) != 0 || c == '_') {
-                while(isalnum(peek(s)) != 0) {
+                while(isalnum(peek(s)) != 0 || peek(s) == '_') {
                     advance(s);
                 }
 
@@ -199,8 +199,20 @@ int scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_ADD;
                 } else if (compare_lexeme(s, "sub") == 1) {
                     t->opcode = OP_SUB;
+                } else if (compare_lexeme(s, "mul") == 1) {
+                    t->opcode = OP_MUL;
+                } else if (compare_lexeme(s, "div") == 1) {
+                    t->opcode = OP_DIV;
+                } else if (compare_lexeme(s, "mod") == 1) {
+                    t->opcode = OP_MOD;
+                } else if (compare_lexeme(s, "inc") == 1) {
+                    t->opcode = OP_INC;
+                } else if (compare_lexeme(s, "dec") == 1) {
+                    t->opcode = OP_DEC;
                 } else if (compare_lexeme(s, "dup") == 1) {
                     t->opcode = OP_DUP;
+                } else if (compare_lexeme(s, "over") == 1) {
+                    t->opcode = OP_OVER;
                 } else if (compare_lexeme(s, "eq") == 1) {
                     t->opcode = OP_EQ;
                 } else if (compare_lexeme(s, "gt") == 1) {
