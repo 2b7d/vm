@@ -262,6 +262,10 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_HALT;
                 } else if (compare_lexeme(s, "syscall") == 1) {
                     t->opcode = OP_SYSCALL;
+                } else if (compare_lexeme(s, "call") == 1) {
+                    t->opcode = OP_CALL;
+                } else if (compare_lexeme(s, "ret") == 1) {
+                    t->opcode = OP_RET;
                 } else {
                     t->kind = TOKEN_LABEL;
                     t->lexeme = lexeme_start(s);

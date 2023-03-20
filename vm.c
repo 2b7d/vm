@@ -260,6 +260,16 @@ int main(int argc, char **argv)
             }
             break;
 
+        case OP_CALL:
+            a = ramload(pc++);
+            retstack[rsp++] = pc;
+            pc = a;
+            break;
+
+        case OP_RET:
+            pc = retstack[--rsp];
+            break;
+
         default:
             printf("ERROR: unknown vm_opcode(%u)\n", op);
             exit(1);

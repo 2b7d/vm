@@ -29,7 +29,9 @@ enum vm_opcode {
 
     OP_HALT,     // ->
 
-    OP_SYSCALL
+    OP_SYSCALL,
+    OP_CALL,
+    OP_RET
 };
 
 enum vm_syscall {
