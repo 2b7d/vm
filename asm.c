@@ -242,6 +242,14 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_SWAP;
                 } else if (compare_lexeme(s, "drop") == 1) {
                     t->opcode = OP_DROP;
+                } else if (compare_lexeme(s, "retpush") == 1) {
+                    t->opcode = OP_RETPUSH;
+                } else if (compare_lexeme(s, "retpop") == 1) {
+                    t->opcode = OP_RETPOP;
+                } else if (compare_lexeme(s, "retcopy") == 1) {
+                    t->opcode = OP_RETCOPY;
+                } else if (compare_lexeme(s, "retdrop") == 1) {
+                    t->opcode = OP_RETDROP;
                 } else if (compare_lexeme(s, "eq") == 1) {
                     t->opcode = OP_EQ;
                 } else if (compare_lexeme(s, "gt") == 1) {

@@ -34,7 +34,6 @@ void print_memory(uint16_t *mem, uint16_t size, char *label)
 
 void push(uint16_t val)
 {
-    // TODO: proper error handling
     if (sp >= STACK_CAP) {
         printf("ERROR: stack overflow\n");
         exit(1);
@@ -45,13 +44,32 @@ void push(uint16_t val)
 
 uint16_t pop()
 {
-    // TODO: proper error handling
     if (sp < 1) {
         printf("ERROR: stack underflow\n");
         exit(1);
     }
 
     return stack[--sp];
+}
+
+void retpush(uint16_t val)
+{
+    if (rsp >= STACK_CAP) {
+        printf("ERROR: return stack overflow\n");
+        exit(1);
+    }
+
+    retstack[rsp++] = val;
+}
+
+uint16_t retpop()
+{
+    if (rsp < 1) {
+        printf("ERROR: return stack underflow\n");
+        exit(1);
+    }
+
+    return retstack[--rsp];
 }
 
 uint16_t ramload(uint16_t addr)
@@ -197,6 +215,22 @@ int main(int argc, char **argv)
             pop();
             break;
 
+        case OP_RETPUSH:
+            retpush(pop());
+            break;
+
+        case OP_RETPOP:
+            push(retpop());
+            break;
+
+        case OP_RETCOPY:
+            push(retstack[rsp - 1]);
+            break;
+
+        case OP_RETDROP:
+            retpop();
+            break;
+
         case OP_EQ:
             push(pop() == pop());
             break;
@@ -262,12 +296,12 @@ int main(int argc, char **argv)
 
         case OP_CALL:
             a = ramload(pc++);
-            retstack[rsp++] = pc;
+            retpush(pc);
             pc = a;
             break;
 
         case OP_RET:
-            pc = retstack[--rsp];
+            pc = retpop();
             break;
 
         default:

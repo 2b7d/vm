@@ -16,6 +16,10 @@ enum vm_opcode {
     OP_OVER,     // n1 n2 -> n1 n2 n1
     OP_SWAP,     // n1 n2 -> n2 n1
     OP_DROP,     // n1 ->
+    OP_RETPUSH,  // n1 ->
+    OP_RETPOP,   // -> n1
+    OP_RETCOPY,  // -> n1
+    OP_RETDROP,  // ->
 
     OP_EQ,       // n1 n2 -> n3
     OP_GT,       // n1 n2 -> n3
@@ -30,8 +34,8 @@ enum vm_opcode {
     OP_HALT,     // ->
 
     OP_SYSCALL,
-    OP_CALL,
-    OP_RET
+    OP_CALL,     // ->
+    OP_RET       // ->
 };
 
 enum vm_syscall {
