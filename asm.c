@@ -260,6 +260,8 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_IFJMP;
                 } else if (compare_lexeme(s, "halt") == 1) {
                     t->opcode = OP_HALT;
+                } else if (compare_lexeme(s, "syscall") == 1) {
+                    t->opcode = OP_SYSCALL;
                 } else {
                     t->kind = TOKEN_LABEL;
                     t->lexeme = lexeme_start(s);
@@ -282,7 +284,7 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                 }
 
                 if (lexeme_len(s) >= sizeof(val))  {
-                    printf("value(%*.s) is greater than 16bit\n",
+                    printf("value(%.*s) is greater than 16bit\n",
                            (int) lexeme_len(s),
                            lexeme_start(s));
                     exit(1);

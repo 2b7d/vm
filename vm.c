@@ -127,9 +127,6 @@ int main(int argc, char **argv)
 
     load_program(*argv);
 
-    print_memory(ram, 20, "RAM");
-    print_memory(stack, sp, "stack");
-
     while (halt == 0) {
         uint16_t a, b;
         uint8_t op = ramload(pc++) & 0xff;
@@ -245,16 +242,29 @@ int main(int argc, char **argv)
             halt = 1;
             break;
 
+        case OP_SYSCALL:
+            a = ramload(pc++);
+            switch (a) {
+            case SYS_WRITE:
+                a = pop();
+                b = pop();
+                for (size_t i = 0; i < a; ++i) {
+                    printf("%c", ramload(b + i));
+                }
+                break;
+
+            case SYS_READ:
+            default:
+                printf("ERROR: unknown vm_syscall(%u)\n", a);
+                exit(1);
+            }
+            break;
+
         default:
             printf("ERROR: unknown vm_opcode(%u)\n", op);
             exit(1);
         }
-
-        print_memory(stack, sp, "stack");
     }
-
-    print_memory(ram, 20, "RAM");
-    print_memory(stack, sp, "stack");
 
     return 0;
 }

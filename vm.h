@@ -27,5 +27,12 @@ enum vm_opcode {
     OP_JMP,      // ->
     OP_IFJMP,    // n1 ->
 
-    OP_HALT      // ->
+    OP_HALT,     // ->
+
+    OP_SYSCALL
+};
+
+enum vm_syscall {
+    SYS_READ,
+    SYS_WRITE   // ptr len ->
 };
