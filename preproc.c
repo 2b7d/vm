@@ -1,182 +1,171 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <string.h>
+#include <ctype.h>
 
+#include "util.h"
 #include "mem.h" // lib
 
-char *read_file(char *pathname)
-{
-    int fd;
-    struct stat statbuf;
-    char *src;
-
-    fd = open(pathname, O_RDONLY);
-    if (fd < 0) {
-        perror("failed to open file");
-        exit(1);
-    }
-
-    if (fstat(fd, &statbuf) < 0) {
-        perror("failed to get file info");
-        exit(1);
-    }
-
-    src = malloc(statbuf.st_size + 1);
-    if (src == NULL) {
-        perror("failed to allocate memory for source");
-        exit(1);
-    }
-
-    if (read(fd, src, statbuf.st_size) < 0) {
-        perror("failed read file content into source");
-        exit(1);
-    }
-
-    src[statbuf.st_size] = '\0';
-
-    close(fd);
-    return src;
-}
-
-struct parser {
-    char *src;
-    char *cur;
-    char *start;
-};
-
-struct define {
+struct directive {
     char *start;
     size_t len;
-
     char *name;
     size_t namelen;
-
     char *value;
     size_t valuelen;
 };
 
-struct define_array {
+struct directive_array {
     size_t size;
     size_t cap;
-    struct define *buf;
+    struct directive *buf;
+};
+
+struct scanner {
+    char *src;
+    char *cur;
 };
 
 int main(int argc, char **argv)
 {
-    struct parser p;
-    struct define_array defs;
+    struct scanner s;
+    struct directive_array dirs;
     FILE *out;
+    char *last_dir;
 
     argc--;
     argv++;
 
-    out = fopen("out.i", "w");
+    if (argc < 1) {
+        printf("assembly file is required\n");
+        return 1;
+    }
+
+    out = fopen(create_outpath(*argv, "i"), "w");
     if (out == NULL) {
         printf("failed to open output file\n");
         return 1;
     }
 
-    meminit(&defs, sizeof(struct define), 0);
-    p.src = read_file(*argv);
-    p.cur = p.src;
+    meminit(&dirs, sizeof(struct directive), 0); // LEAK: OS is freeing
+    s.src = read_file(*argv); // LEAK: OS is freeing
+    s.cur = s.src;
 
-    for (;;) {
-        struct define *d;
+    while (*s.cur != '\0') {
+        char *start = s.cur;
 
-        if (*p.cur == '\0') {
-            break;
-        }
-
-        p.start = p.cur;
-
-        if (*p.cur != '#') {
-            p.cur++;
+        if (*s.cur != '#') {
+            s.cur++;
             continue;
         }
 
-        while (*p.cur != ' ' && *p.cur != '\0') {
-            p.cur++;
+        s.cur++;
+        while (isalpha(*s.cur) != 0 && *s.cur != '\0') {
+            s.cur++;
         }
-
-        if (memcmp(p.start + 1, "define", p.cur - p.start - 1) != 0) {
-            printf("Unknown directive %.*s\n", (int) (p.cur - p.start),
-                                               p.start);
+        if (*s.cur == '\0') {
+            printf("Invalid directive %.10s...\n", start);
             return 1;
         }
 
-        memgrow(&defs, sizeof(struct define));
-        d = defs.buf + defs.size;
-        defs.size++;
+        if (memcmp(start + 1, "define", s.cur - start - 1) == 0) {
+            struct directive *d;
 
-        d->start = p.start;
+            memgrow(&dirs, sizeof(struct directive));
+            d = dirs.buf + dirs.size;
+            dirs.size++;
 
-        p.cur++;
-        p.start = p.cur;
-        while (*p.cur != ' ' && *p.cur != '\0') {
-            p.cur++;
-        } // TODO: handle error
+            d->start = start;
 
-        d->name = p.start;
-        d->namelen = p.cur - p.start;
-
-        p.cur++;
-        p.start = p.cur;
-        while (*p.cur != '\n' && *p.cur != '\0') {
-            p.cur++;
-        } // TODO: handle error
-
-        d->value = p.start;
-        d->valuelen = p.cur - p.start;
-        d->len = p.cur - d->start;
-        p.cur++;
-    }
-
-    p.cur = p.src;
-    while (*p.cur != '\0') {
-        int def_found = 0,
-            value_found = 0;
-
-        for (size_t i = 0; i < defs.size; ++i) {
-            struct define *d = defs.buf + i;
-
-            if (p.cur == d->start) {
-                p.cur += d->len + 1;
-                def_found = 1;
-                break;
+            s.cur++;
+            start = s.cur;
+            while (isspace(*s.cur) == 0 && *s.cur != '\0') {
+                s.cur++;
             }
-        }
+            if (*s.cur == '\0') {
+                printf("Invalid directive %.10s...\n", start);
+                return 1;
+            }
 
-        if (def_found == 1) {
+            d->name = start;
+            d->namelen = s.cur - start;
+
+            s.cur++;
+            start = s.cur;
+            while (isspace(*s.cur) == 0 && *s.cur != '\0') {
+                s.cur++;
+            }
+            if (*s.cur == '\0') {
+                printf("Invalid directive %.10s...\n", start);
+                return 1;
+            }
+
+            d->value = start;
+            d->valuelen = s.cur - start;
+            d->len = s.cur - d->start;
+            s.cur++;
             continue;
         }
 
-        p.start = p.cur;
-        while (*p.cur != ' ' && *p.cur != '\n' && *p.cur != '\0') {
-            p.cur++;
+        printf("Unknown directive %.*s\n", (int) (s.cur - start), start);
+        return 1;
+    }
+
+    last_dir = NULL;
+    for (size_t i = 0; i < dirs.size; ++i) {
+        struct directive *d = dirs.buf + i;
+        char *end = d->start + d->len;
+
+        if (last_dir == NULL) {
+            last_dir = end;
+            continue;
         }
 
-        for (size_t i = 0; i < defs.size; ++i) {
-            struct define *d = defs.buf + i;
+        if (end > last_dir) {
+            last_dir = end;
+        }
+    }
 
-            if ((size_t) (p.cur - p.start) != d->namelen) {
-                continue;
+    s.cur = s.src;
+
+    while (*s.cur != '\0') {
+        if (s.cur < last_dir) {
+            for (size_t i = 0; i < dirs.size; ++i) {
+                struct directive *d = dirs.buf + i;
+
+                if (s.cur == d->start) {
+                    s.cur += d->len;
+                    break;
+                }
             }
+        }
 
-            if (memcmp(p.start, d->name, d->namelen) == 0) {
-                value_found = 1;
+        for (size_t i = 0; i < dirs.size; ++i) {
+            struct directive *d = dirs.buf + i;
+
+            if (*s.cur == *d->name) {
+                size_t len;
+                char *start = s.cur, *ch = s.cur;
+
+                while (isspace(*ch) == 0 && *ch != '\0') {
+                    ch++;
+                }
+
+                len = ch - start;
+                if (len != d->namelen ||
+                        memcmp(start, d->name, d->namelen) != 0) {
+                    continue;
+                }
+
                 fwrite(d->value, d->valuelen, 1, out);
+                s.cur = ch;
                 break;
             }
         }
 
-        if (value_found == 0) {
-            p.cur++;
-            fwrite(p.start, p.cur - p.start, 1, out);
-        }
+        fwrite(s.cur, 1, 1, out);
+        s.cur++;
     }
 
+    fclose(out);
     return 0;
 }
