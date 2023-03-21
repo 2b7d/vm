@@ -11,16 +11,12 @@ _start:
 strlen:
     push 0
 strlen_loop:
-    over
-    over
-    add
-    ld
+    over over add ld
 
-    push 0
-    eq
+    push 0 eq
     jmpif strlen_done
 
     inc
     jmp strlen_loop
 strlen_done:
-    ret
+ret
