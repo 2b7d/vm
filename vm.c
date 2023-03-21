@@ -12,7 +12,6 @@ enum {
 
 uint16_t ram[RAM_CAP];
 uint16_t stack[STACK_CAP];
-uint16_t retstack[STACK_CAP];
 
 uint16_t pc;
 uint16_t sp;
@@ -31,6 +30,27 @@ void print_memory(uint16_t *mem, uint16_t size, char *label)
     }
     printf("}\n");
 }
+
+uint16_t ramload(uint16_t addr)
+{
+    if (addr >= RAM_CAP) {
+        printf("ERROR: address(0x%04x) is out of bound\n", addr);
+        exit(1);
+    }
+
+    return ram[addr];
+}
+
+void ramstore(uint16_t addr, uint16_t val)
+{
+    if (addr >= RAM_CAP) {
+        printf("ERROR: address(0x%04x) is out of bound\n", addr);
+        exit(1);
+    }
+
+    ram[addr] = val;
+}
+
 
 void push(uint16_t val)
 {
@@ -54,42 +74,15 @@ uint16_t pop()
 
 void retpush(uint16_t val)
 {
-    if (rsp >= STACK_CAP) {
-        printf("ERROR: return stack overflow\n");
-        exit(1);
-    }
 
-    retstack[rsp++] = val;
+    // TODO: handle overflow
+    ramstore(rsp--, val);
 }
 
 uint16_t retpop()
 {
-    if (rsp < 1) {
-        printf("ERROR: return stack underflow\n");
-        exit(1);
-    }
-
-    return retstack[--rsp];
-}
-
-uint16_t ramload(uint16_t addr)
-{
-    if (addr >= RAM_CAP) {
-        printf("ERROR: address(0x%04x) is out of bound\n", addr);
-        exit(1);
-    }
-
-    return ram[addr];
-}
-
-void ramstore(uint16_t addr, uint16_t val)
-{
-    if (addr >= RAM_CAP) {
-        printf("ERROR: address(0x%04x) is out of bound\n", addr);
-        exit(1);
-    }
-
-    ram[addr] = val;
+    // TODO: handle underflow
+    return ramload(++rsp);
 }
 
 void load_program(char *pathname)
@@ -141,7 +134,7 @@ int main(int argc, char **argv)
 
     pc = 0;
     sp = 0;
-    rsp = 0;
+    rsp = RAM_CAP - 1;
 
     load_program(*argv);
 
@@ -224,11 +217,19 @@ int main(int argc, char **argv)
             break;
 
         case OP_RETCOPY:
-            push(retstack[rsp - 1]);
+            push(ramload(rsp + 1));
             break;
 
         case OP_RETDROP:
             retpop();
+            break;
+
+        case OP_RETSP:
+            push(rsp);
+            break;
+
+        case OP_RETSPSET:
+            rsp = pop();
             break;
 
         case OP_EQ:
@@ -265,7 +266,7 @@ int main(int argc, char **argv)
             pc = ramload(pc);
             break;
 
-        case OP_IFJMP:
+        case OP_JMPIF:
             a = ramload(pc++);
             if (pop() == 1) {
                 pc = a;

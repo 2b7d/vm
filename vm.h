@@ -19,6 +19,8 @@ enum vm_opcode {
     OP_RETPOP,   // -> n1
     OP_RETCOPY,  // -> n1
     OP_RETDROP,  // ->
+    OP_RETSP,    // -> n1
+    OP_RETSPSET, // n1 ->
 
     OP_EQ,       // n1 n2 -> n3
     OP_GT,       // n1 n2 -> n3
@@ -28,7 +30,7 @@ enum vm_opcode {
     OP_NOT,      // n1 -> n2
 
     OP_JMP,      // ->
-    OP_IFJMP,    // n1 ->
+    OP_JMPIF,    // n1 ->
 
     OP_HALT,     // ->
 

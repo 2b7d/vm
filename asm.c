@@ -250,6 +250,10 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_RETCOPY;
                 } else if (compare_lexeme(s, "retdrop") == 1) {
                     t->opcode = OP_RETDROP;
+                } else if (compare_lexeme(s, "retsp") == 1) {
+                    t->opcode = OP_RETSP;
+                } else if (compare_lexeme(s, "retspset") == 1) {
+                    t->opcode = OP_RETSPSET;
                 } else if (compare_lexeme(s, "eq") == 1) {
                     t->opcode = OP_EQ;
                 } else if (compare_lexeme(s, "gt") == 1) {
@@ -264,8 +268,8 @@ void scan(struct scanner *s, struct tokens *toks, struct labels *ls)
                     t->opcode = OP_NOT;
                 } else if (compare_lexeme(s, "jmp") == 1) {
                     t->opcode = OP_JMP;
-                } else if (compare_lexeme(s, "ifjmp") == 1) {
-                    t->opcode = OP_IFJMP;
+                } else if (compare_lexeme(s, "jmpif") == 1) {
+                    t->opcode = OP_JMPIF;
                 } else if (compare_lexeme(s, "halt") == 1) {
                     t->opcode = OP_HALT;
                 } else if (compare_lexeme(s, "syscall") == 1) {
