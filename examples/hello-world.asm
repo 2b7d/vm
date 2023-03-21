@@ -1,9 +1,13 @@
-message: "hello, world" 10 0
+#define LF 10
+#define NULL 0
+#define SYS_write 1
+
+message: "hello, world" LF NULL
 
 _start:
     push message
     call strlen
-    syscall 1
+    syscall SYS_write
 
     halt
 

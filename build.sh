@@ -10,7 +10,7 @@ if [ "$2" = "prod" ]; then
     flags=${flags/-g/-O2}
 fi
 
-if [ "$name" = "asm" ]; then
+if [ "$name" = "asm" ] || [ "$name" = "preproc" ]; then
     libs="-I/home/fosseddy/programming/c-sandbox/mem -L/home/fosseddy/programming/c-sandbox/mem -lmem"
 fi
 
