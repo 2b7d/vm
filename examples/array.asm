@@ -18,6 +18,6 @@ loop:
     dup
     push array_len ld
     lt
-    ifjmp loop
+    jmpif loop
 
     halt

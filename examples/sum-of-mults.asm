@@ -22,7 +22,7 @@ loop:
 
     or
     not
-    ifjmp skip_add
+    jmpif skip_add
 
     dup
     push sum ld
@@ -33,6 +33,6 @@ skip_add:
     dup
     push range ld
     lt
-    ifjmp loop ; while (num < range)
+    jmpif loop ; while (num < range)
 
     halt

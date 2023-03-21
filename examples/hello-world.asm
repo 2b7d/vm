@@ -18,7 +18,7 @@ strlen_loop:
 
     push 0
     eq
-    ifjmp strlen_done
+    jmpif strlen_done
 
     inc
     jmp strlen_loop

@@ -33,7 +33,7 @@ itoa_loop:
     push 0
     eq
 
-    ifjmp itoa_done
+    jmpif itoa_done
 
     swap
     inc swap
@@ -55,7 +55,7 @@ itoa_reverse:
 
     swap
     lt
-    ifjmp itoa_reverse
+    jmpif itoa_reverse
 
     push buffer add
     push 10

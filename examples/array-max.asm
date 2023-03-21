@@ -17,7 +17,7 @@ loop:
     push max ld
     gt
 
-    ifjmp new_max
+    jmpif new_max
 
     drop
 
@@ -26,7 +26,7 @@ inc_counter:
     dup
     push arr_len ld
     lt
-    ifjmp loop
+    jmpif loop
 
     halt
 
