@@ -136,13 +136,21 @@ int main(int argc, char **argv)
 
     p.cur = p.src;
     while (*p.cur != '\0') {
+        int def_found = 0,
+            value_found = 0;
+
         for (size_t i = 0; i < defs.size; ++i) {
             struct define *d = defs.buf + i;
 
             if (p.cur == d->start) {
                 p.cur += d->len + 1;
-                i = 0;
+                def_found = 1;
+                break;
             }
+        }
+
+        if (def_found == 1) {
+            continue;
         }
 
         p.start = p.cur;
@@ -150,27 +158,23 @@ int main(int argc, char **argv)
             p.cur++;
         }
 
-        {
-            int found = 0;
+        for (size_t i = 0; i < defs.size; ++i) {
+            struct define *d = defs.buf + i;
 
-            for (size_t i = 0; i < defs.size; ++i) {
-                struct define *d = defs.buf + i;
-
-                if ((size_t) (p.cur - p.start) != d->namelen) {
-                    continue;
-                }
-
-                if (memcmp(p.start, d->name, d->namelen) == 0) {
-                    found = 1;
-                    fwrite(d->value, d->valuelen, 1, out);
-                    break;
-                }
+            if ((size_t) (p.cur - p.start) != d->namelen) {
+                continue;
             }
 
-            if (found == 0) {
-                p.cur++;
-                fwrite(p.start, p.cur - p.start, 1, out);
+            if (memcmp(p.start, d->name, d->namelen) == 0) {
+                value_found = 1;
+                fwrite(d->value, d->valuelen, 1, out);
+                break;
             }
+        }
+
+        if (value_found == 0) {
+            p.cur++;
+            fwrite(p.start, p.cur - p.start, 1, out);
         }
     }
 

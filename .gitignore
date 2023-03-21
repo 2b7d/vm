@@ -1,3 +1,5 @@
 vm
 asm
 preproc
+*.i
+*.out
