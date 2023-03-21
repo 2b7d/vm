@@ -36,7 +36,9 @@ enum vm_opcode {
 
     OP_SYSCALL,
     OP_CALL,     // ->
-    OP_RET       // ->
+    OP_RET,      // ->
+
+    OP_COUNT
 };
 
 enum vm_syscall {
