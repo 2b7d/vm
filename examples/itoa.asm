@@ -3,27 +3,37 @@
 #define LF 10
 
 _start:
+    push LF rspush        ; +8 LF
     rsp push 7 sub rspset ; +1 buf[7]
 
-    rsp push 1 add
     push 69
-    swap
+    rsp push 1 add
     call itoa
-    dup
     call strlen
+    syscall SYS_write
+
+    rsp push 8 add
+    push 1
     syscall SYS_write
 
     push 420
-    swap
+    rsp push 1 add
     call itoa
-    dup
     call strlen
     syscall SYS_write
 
+    rsp push 8 add
+    push 1
+    syscall SYS_write
+
     push 8
-    swap
+    rsp push 1 add
     call itoa
     call strlen
+    syscall SYS_write
+
+    rsp push 8 add
+    push 1
     syscall SYS_write
 
     halt
@@ -49,11 +59,6 @@ itoa_copyto_buf:
     lt jmpif itoa_copyto_buf
 
     rsp push 3 add ld
-    over over
-    add
-    push LF swap st
-
-    swap inc swap
     add
     push NULL swap st
 
