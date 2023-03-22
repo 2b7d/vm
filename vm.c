@@ -7,7 +7,9 @@
 
 enum {
     RAM_CAP = 1 << 15,
-    STACK_CAP = 1 << 7
+    STACK_CAP = 1 << 7,
+    BRK = RAM_CAP - 1,
+    RSP = RAM_CAP - 2
 };
 
 uint16_t ram[RAM_CAP];
@@ -16,20 +18,6 @@ uint16_t stack[STACK_CAP];
 uint16_t pc;
 uint16_t sp;
 uint16_t rsp;
-
-void print_memory(uint16_t *mem, uint16_t size, char *label)
-{
-    uint16_t i;
-
-    printf("%-8s {", label);
-    for (i = 0; i < size ; ++i) {
-        printf("%u", mem[i]);
-        if (i != size - 1) {
-            printf(", ");
-        }
-    }
-    printf("}\n");
-}
 
 uint16_t ramload(uint16_t addr)
 {
@@ -113,6 +101,7 @@ void load_program(char *pathname)
         }
 
         if (feof(f) != 0) {
+            ramstore(BRK, i - 1);
             break;
         }
     }
@@ -134,7 +123,7 @@ int main(int argc, char **argv)
 
     pc = 0;
     sp = 0;
-    rsp = RAM_CAP - 1;
+    rsp = RSP;
 
     load_program(*argv);
 
@@ -208,27 +197,27 @@ int main(int argc, char **argv)
             pop();
             break;
 
-        case OP_RETPUSH:
+        case OP_RSPUSH:
             retpush(pop());
             break;
 
-        case OP_RETPOP:
+        case OP_RSPOP:
             push(retpop());
             break;
 
-        case OP_RETCOPY:
+        case OP_RSCOPY:
             push(ramload(rsp + 1));
             break;
 
-        case OP_RETDROP:
+        case OP_RSDROP:
             retpop();
             break;
 
-        case OP_RETSP:
+        case OP_RSP:
             push(rsp);
             break;
 
-        case OP_RETSPSET:
+        case OP_RSPSET:
             rsp = pop();
             break;
 
@@ -284,7 +273,7 @@ int main(int argc, char **argv)
                 a = pop();
                 b = pop();
                 for (size_t i = 0; i < a; ++i) {
-                    printf("%c", ramload(b + i));
+                    fputc(ramload(b + i), stdout);
                 }
                 break;
 
