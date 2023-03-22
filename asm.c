@@ -83,19 +83,6 @@ char *opcodes_str[OP_COUNT] = {
     [OP_RET]      = "ret"
 };
 
-int lexcmp(char *a, size_t as, char *b, size_t bs)
-{
-    if (as != bs) {
-        return 0;
-    }
-
-    if (memcmp(a, b, bs) != 0) {
-        return 0;
-    }
-
-    return 1;
-}
-
 void scan(struct scanner *s, struct token_array *tokens,
           struct label_array *labels)
 {
@@ -159,12 +146,12 @@ void scan(struct scanner *s, struct token_array *tokens,
                     for (size_t i = 0; i < labels->size; ++i) {
                         l = labels->buf + i;
 
-                        if (lexcmp(start, lexlen, l->start, l->len) == 0) {
-                            continue;
+                        if (lexlen == l->len &&
+                                memcmp(start, l->start, l->len) == 0) {
+                            printf("label %.*s already declared\n",
+                                    (int) l->len, l->start);
+                            exit(1);
                         }
-                        printf("label %.*s already declared\n", (int) l->len,
-                                                                l->start);
-                        exit(1);
                     }
 
                     memgrow(labels, sizeof(struct label));
@@ -189,7 +176,8 @@ void scan(struct scanner *s, struct token_array *tokens,
                 for (size_t i = 0; i < OP_COUNT; ++i) {
                     char *op = opcodes_str[i];
 
-                    if (lexcmp(start, lexlen, op, strlen(op)) == 1) {
+                    if (lexlen == strlen(op) &&
+                            memcmp(start, op, lexlen) == 0) {
                         t->kind = TOKEN_OPCODE;
                         t->opcode = i;
                         break;
@@ -252,7 +240,7 @@ void resolve_labels(struct token_array *tokens, struct label_array *labels)
         for (size_t j = 0; j < labels->size; ++j) {
             struct label *l = labels->buf + j;
 
-            if (lexcmp(t->lex, t->lexlen, l->start, l->len) == 1) {
+            if (t->lexlen == l->len && memcmp(t->lex, l->start, l->len) == 0) {
                 label_found = 1;
                 t->value = l->addr;
                 break;
@@ -273,12 +261,11 @@ void write_opcodes(char *pathname, struct token_array *tokens,
     uint16_t main_addr;
     char *main = "_start";
     int main_found = 0;
-    size_t mainlen = strlen(main);
 
     for (size_t i = 0; i < labels->size; ++i) {
         struct label *l = labels->buf + i;
 
-        if (lexcmp(l->start, l->len, main, mainlen) == 1) {
+        if (l->len == strlen(main) && memcmp(main, l->start, l->len) == 0) {
             main_found = 1;
             main_addr = l->addr;
             break;
