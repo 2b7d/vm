@@ -26,8 +26,8 @@ struct token {
     enum vm_opcode opcode;
     enum token_kind kind;
     uint16_t value;
-    char *lexeme;
-    size_t lexemelen;
+    char *lex;
+    size_t lexlen;
 };
 
 struct token_array {
@@ -37,7 +37,7 @@ struct token_array {
 };
 
 struct label {
-    size_t addr;
+    uint16_t addr;
     char *start;
     size_t len;
 };
@@ -48,7 +48,7 @@ struct label_array {
     struct label *buf;
 };
 
-char *opcode_strings[OP_COUNT] = {
+char *opcodes_str[OP_COUNT] = {
     [OP_ST]       = "st",
     [OP_LD]       = "ld",
     [OP_ADD]      = "add",
@@ -83,17 +83,17 @@ char *opcode_strings[OP_COUNT] = {
     [OP_RET]      = "ret"
 };
 
-int compare_lexeme(char *start, size_t len, char *word)
+int lexcmp(char *a, size_t as, char *b, size_t bs)
 {
-    if (strlen(word) != len) {
+    if (as != bs) {
         return 0;
     }
 
-    if (strncmp(start, word, len) == 0) {
-        return 1;
+    if (memcmp(a, b, bs) != 0) {
+        return 0;
     }
 
-    return 0;
+    return 1;
 }
 
 void scan(struct scanner *s, struct token_array *tokens,
@@ -145,14 +145,27 @@ void scan(struct scanner *s, struct token_array *tokens,
         default:
             if (isalpha(*s->cur) != 0 || *s->cur == '_') {
                 struct token *t;
-                int is_opcode = 0;
+                size_t lexlen;
 
                 while (isalnum(*s->cur) != 0 || *s->cur == '_') {
                     s->cur++;
                 }
 
+                lexlen = s->cur - start;
+
                 if (*s->cur == ':') {
                     struct label *l;
+
+                    for (size_t i = 0; i < labels->size; ++i) {
+                        l = labels->buf + i;
+
+                        if (lexcmp(start, lexlen, l->start, l->len) == 0) {
+                            continue;
+                        }
+                        printf("label %.*s already declared\n", (int) l->len,
+                                                                l->start);
+                        exit(1);
+                    }
 
                     memgrow(labels, sizeof(struct label));
                     l = labels->buf + labels->size;
@@ -160,7 +173,7 @@ void scan(struct scanner *s, struct token_array *tokens,
 
                     l->addr = tokens->size;
                     l->start = start;
-                    l->len = s->cur - start;
+                    l->len = lexlen;
                     s->cur++;
                     break;
                 }
@@ -169,29 +182,26 @@ void scan(struct scanner *s, struct token_array *tokens,
                 t = tokens->buf + tokens->size;
                 tokens->size++;
 
-                t->kind = TOKEN_OPCODE;
+                t->kind = TOKEN_LABEL;
+                t->lex = start;
+                t->lexlen = lexlen;
+
                 for (size_t i = 0; i < OP_COUNT; ++i) {
-                    if (compare_lexeme(start,
-                                       s->cur - start,
-                                       opcode_strings[i]) == 1) {
+                    char *op = opcodes_str[i];
+
+                    if (lexcmp(start, lexlen, op, strlen(op)) == 1) {
+                        t->kind = TOKEN_OPCODE;
                         t->opcode = i;
-                        is_opcode = 1;
                         break;
                     }
                 }
-
-                if (is_opcode == 0) {
-                    t->kind = TOKEN_LABEL;
-                    t->lexeme = start;
-                    t->lexemelen = s->cur - start;
-                }
-
                 break;
             }
 
             if (isdigit(*s->cur) != 0) {
                 struct token *t;
-                char val[6];
+                char valbuf[6];
+                size_t lexlen, val;
 
                 memgrow(tokens, sizeof(struct token));
                 t = tokens->buf + tokens->size;
@@ -201,24 +211,105 @@ void scan(struct scanner *s, struct token_array *tokens,
                     s->cur++;
                 }
 
-                if ((size_t) (s->cur - start) >= sizeof(val))  {
-                    printf("value %.*s is greater than 16bit\n",
-                           (int) (s->cur - start),
-                           start);
+                lexlen = s->cur - start;
+
+                if (lexlen >= sizeof(valbuf))  {
+                    printf("value %.*s is greater than 16bit\n", (int) lexlen,
+                                                                 start);
                     exit(1);
                 }
 
-                memset(val, 0, sizeof(val));
-                memcpy(val, start, s->cur - start);
+                memset(valbuf, 0, sizeof(valbuf));
+                memcpy(valbuf, start, lexlen);
+
+                val = atoi(valbuf);
+                if (val >= 1 << 16) {
+                    printf("value %lu is greater than 16bit\n", val);
+                    exit(1);
+                }
+
                 t->kind = TOKEN_IMMEDIATE;
-                t->value = atoi(val);
+                t->value = val;
                 break;
             }
 
-            printf("ERROR: unknown character `%c`\n", *s->cur);
+            printf("unknown character `%c`\n", *s->cur);
             exit(1);
         }
     }
+}
+
+void resolve_labels(struct token_array *tokens, struct label_array *labels)
+{
+    for (size_t i = 0; i < tokens->size; ++i) {
+        int label_found = 0;
+        struct token *t = tokens->buf + i;
+
+        if (t->kind != TOKEN_LABEL) {
+            continue;
+        }
+
+        for (size_t j = 0; j < labels->size; ++j) {
+            struct label *l = labels->buf + j;
+
+            if (lexcmp(t->lex, t->lexlen, l->start, l->len) == 1) {
+                label_found = 1;
+                t->value = l->addr;
+                break;
+            }
+        }
+
+        if (label_found == 0) {
+            printf("undefined label %.*s\n", (int) t->lexlen, t->lex);
+            exit(1);
+        }
+    }
+}
+
+void write_opcodes(char *pathname, struct token_array *tokens,
+                   struct label_array *labels)
+{
+    FILE *f;
+    uint16_t main_addr;
+    char *main = "_start";
+    int main_found = 0;
+    size_t mainlen = strlen(main);
+
+    for (size_t i = 0; i < labels->size; ++i) {
+        struct label *l = labels->buf + i;
+
+        if (lexcmp(l->start, l->len, main, mainlen) == 1) {
+            main_found = 1;
+            main_addr = l->addr;
+            break;
+        }
+    }
+
+    if (main_found == 0) {
+        printf("%s entry point is missing\n", main);
+        exit(1);
+    }
+
+    f = fopen(pathname, "w");
+    if (f == NULL) {
+        perror("failed to open file");
+        exit(1);
+    }
+
+    fwrite(&main_addr, sizeof(uint16_t), 1, f);
+
+    for (size_t i = 0; i < tokens->size; ++i) {
+        struct token *t = tokens->buf + i;
+        uint16_t val = t->opcode;
+
+        if (t->kind != TOKEN_OPCODE) {
+            val = t->value;
+        }
+
+        fwrite(&val, sizeof(uint16_t), 1, f);
+    }
+
+    fclose(f);
 }
 
 int main(int argc, char **argv)
@@ -226,7 +317,7 @@ int main(int argc, char **argv)
     struct scanner s;
     struct token_array tokens;
     struct label_array labels;
-    FILE *out;
+    char *outpath;
 
     argc--;
     argv++;
@@ -236,84 +327,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    out = fopen(create_outpath(*argv, NULL), "w");
-    if (out == NULL) {
-        printf("failed to open out file\n");
-        return 1;
-    }
-
-    s.src = read_file(*argv); // LEAK: OS is freeing
+    outpath = create_outpath(*argv, NULL); // LEAK: os is freeing
+    s.src = read_file(*argv); // LEAK: os is freeing
     s.cur = s.src;
 
-    meminit(&tokens, sizeof(struct token), 64); // LEAK: OS is freeing
-    meminit(&labels, sizeof(struct label), 32); // LEAK: OS is freeing
+    meminit(&tokens, sizeof(struct token), 64); // LEAK: os is freeing
+    meminit(&labels, sizeof(struct label), 32); // LEAK: os is freeing
 
     scan(&s, &tokens, &labels);
+    resolve_labels(&tokens, &labels);
+    write_opcodes(outpath, &tokens, &labels);
 
-    {
-        int start_found = 0;
-        char *start = "_start";
-        size_t len = strlen(start);
-
-        for (size_t i = 0; i < labels.size; ++i) {
-            struct label *l = labels.buf + i;
-
-            if (l->len != len) {
-                continue;
-            }
-
-            if (memcmp(l->start, start, len) == 0) {
-                start_found = 1;
-                fwrite(&l->addr, sizeof(uint16_t), 1, out);
-                break;
-            }
-        }
-
-        if (start_found == 0) {
-            printf("_start entry point is missing\n");
-            return 1;
-        }
-    }
-
-    for (size_t i = 0; i < tokens.size; ++i) {
-        int label_found = 0;
-        struct token *t = tokens.buf + i;
-
-        if (t->kind != TOKEN_LABEL) {
-            continue;
-        }
-
-        for (size_t j = 0; j < labels.size; ++j) {
-            struct label *l = labels.buf + j;
-
-            if (t->lexemelen != l->len) {
-                continue;
-            }
-
-            if (memcmp(t->lexeme, l->start, l->len) == 0) {
-                label_found = 1;
-                t->value = l->addr;
-                break;
-            }
-        }
-
-        if (label_found == 0) {
-            printf("Undefined label %.*s\n", (int) t->lexemelen, t->lexeme);
-            return 1;
-        }
-    }
-
-    for (size_t i = 0; i < tokens.size; ++i) {
-        struct token *t = tokens.buf + i;
-        uint16_t val = t->opcode;
-
-        if (t->kind != TOKEN_OPCODE) {
-            val = t->value;
-        }
-
-        fwrite(&val, sizeof(uint16_t), 1, out);
-    }
-
-    fclose(out);
     return 0;
 }
