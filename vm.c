@@ -221,6 +221,16 @@ int main(int argc, char **argv)
             rsp = pop();
             break;
 
+        case OP_BRK:
+            push(ramload(BRK));
+            break;
+
+        case OP_BRKSET:
+            a = ramload(BRK);
+            ramstore(BRK, pop());
+            push(a);
+            break;
+
         case OP_EQ:
             push(pop() == pop());
             break;
