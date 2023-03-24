@@ -25,6 +25,7 @@ enum token_kind {
 struct token {
     enum vm_opcode opcode;
     enum token_kind kind;
+    uint8_t is_word;
     uint16_t value;
     char *lex;
     size_t lexlen;
@@ -85,6 +86,8 @@ char *opcodes_str[OP_COUNT] = {
     [OP_RET]      = "ret"
 };
 
+static size_t addr_offset = 0;
+
 void scan(struct scanner *s, struct token_array *tokens,
           struct label_array *labels)
 {
@@ -112,7 +115,8 @@ void scan(struct scanner *s, struct token_array *tokens,
             }
 
             if (*s->cur == '\0') {
-                printf("unterminated string %.5s...\n", start);
+                printf("unterminated string %.*s...\n", (int) (s->cur - start),
+                                                        start);
                 exit(1);
             }
 
@@ -126,6 +130,8 @@ void scan(struct scanner *s, struct token_array *tokens,
 
                 t->kind = TOKEN_IMMEDIATE;
                 t->value = val;
+                t->is_word = 0;
+                addr_offset++;
             }
 
             s->cur++;
@@ -160,7 +166,7 @@ void scan(struct scanner *s, struct token_array *tokens,
                     l = labels->buf + labels->size;
                     labels->size++;
 
-                    l->addr = tokens->size;
+                    l->addr = addr_offset;
                     l->start = start;
                     l->len = lexlen;
                     s->cur++;
@@ -178,12 +184,28 @@ void scan(struct scanner *s, struct token_array *tokens,
                 for (size_t i = 0; i < OP_COUNT; ++i) {
                     char *op = opcodes_str[i];
 
+                    if (start[lexlen - 1] == '8') {
+                        if (lexlen-1 == strlen(op) &&
+                                memcmp(start, op, lexlen-1) == 0) {
+                            t->kind = TOKEN_OPCODE;
+                            t->opcode = i;
+                            t->is_word = 0;
+                            break;
+                        }
+                    }
+
                     if (lexlen == strlen(op) &&
                             memcmp(start, op, lexlen) == 0) {
                         t->kind = TOKEN_OPCODE;
                         t->opcode = i;
+                        t->is_word = 1;
                         break;
                     }
+                }
+                if (t->kind == TOKEN_LABEL) {
+                    addr_offset += 2;
+                } else {
+                    addr_offset++;
                 }
                 break;
             }
@@ -220,6 +242,21 @@ void scan(struct scanner *s, struct token_array *tokens,
 
                 t->kind = TOKEN_IMMEDIATE;
                 t->value = val;
+                t->is_word = 0;
+
+                if (tokens->size > 0) {
+                    struct token *prev = tokens->buf + tokens->size - 2;
+
+                    if (prev->kind == TOKEN_OPCODE) {
+                        t->is_word = prev->is_word;
+                    }
+                }
+
+                if (t->is_word) {
+                    addr_offset += 2;
+                } else {
+                    addr_offset++;
+                }
                 break;
             }
 
@@ -289,13 +326,33 @@ void write_opcodes(char *pathname, struct token_array *tokens,
 
     for (size_t i = 0; i < tokens->size; ++i) {
         struct token *t = tokens->buf + i;
-        uint16_t val = t->opcode;
+        uint8_t inst, lsb, msb;
 
-        if (t->kind != TOKEN_OPCODE) {
-            val = t->value;
+        switch (t->kind) {
+        case TOKEN_OPCODE:
+            inst = t->is_word << 7 | t->opcode;
+            fwrite(&inst, sizeof(uint8_t), 1, f);
+            break;
+
+        case TOKEN_IMMEDIATE:
+            if (t->is_word == 1) {
+                lsb = t->value;
+                msb = t->value >> 8;
+                fwrite(&lsb, sizeof(uint8_t), 1, f);
+                fwrite(&msb, sizeof(uint8_t), 1, f);
+            } else {
+                inst = t->value;
+                fwrite(&inst, sizeof(uint8_t), 1, f);
+            }
+            break;
+
+        case TOKEN_LABEL:
+            lsb = t->value;
+            msb = t->value >> 8;
+            fwrite(&lsb, sizeof(uint8_t), 1, f);
+            fwrite(&msb, sizeof(uint8_t), 1, f);
+            break;
         }
-
-        fwrite(&val, sizeof(uint16_t), 1, f);
     }
 
     fclose(f);
