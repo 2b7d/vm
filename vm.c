@@ -175,12 +175,11 @@ int main(int argc, char **argv)
 
         switch (opcode) {
         case OP_ST:
+            a = pop();
             if (mode == 1) {
-                a = pop();
                 ramstore(a, pop());
             } else {
-                a8 = pop8();
-                ramstore8(a8, pop8());
+                ramstore8(a, pop8());
             }
             break;
 
@@ -188,7 +187,7 @@ int main(int argc, char **argv)
             if (mode == 1) {
                 push(ramload(pop()));
             } else {
-                push8(ramload8(pop8()));
+                push8(ramload8(pop()));
             }
             break;
 

@@ -11,13 +11,13 @@ _start:
 
     halt
 
-; ptr -> ptr n1
+; ptrb -> ptrb n1
 strlen:
     push 0
 strlen_loop:
-    over over add ld
+    over over add ld8
 
-    push 0 eq
+    push8 0 eq8
     jmpif strlen_done
 
     inc
