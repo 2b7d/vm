@@ -1,0 +1,25 @@
+program -> text_statement?
+           data_statement?
+           global_statement*
+           extern_statement*
+           EOF
+
+func_declaration -> symbol ":" (opcode | symbol | number | string)*
+var_declaration  -> symbol ":" (define_byte | define_word)+
+
+text_statement   -> "section" "text" func_declaration*
+data_statement   -> "section" "data" var_declaration*
+global_statement -> "global" symbol_list
+extern_statement -> "extern" symbol_list
+
+define_byte -> "db" (string | number)+
+define_word -> number+
+symbol_list -> symbol ("," symbol)*
+
+symbol -> char (char | digit)*
+opcode -> char (char | digit)*
+number -> digit+
+string -> ""<any except """>*""
+
+char  -> "a".."z" | "A".."Z" | "_" | "."
+digit -> "0".."9"

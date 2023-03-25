@@ -1,0 +1,55 @@
+file1.asm
+--------------
+.global _start
+.extern strlen
+.data
+    message: .byte "hello, world" 10 0
+    something: 420
+.text
+_start:
+    push message
+    call strlen push .byte "a"
+    halt
+--------------
+file1.o
+--------------
+.symtab
+    value size type  bind   section name
+    0     14   VAR   LOCAL  2       message
+    14    2    VAR   LOCAL  2       something
+    0     7    FUNC  GLOBAL 1       _start
+    0     9    UNDEF EXTERN 0       strlen
+.data
+    'h' ... 'd' 0xa 0x0 0x42 0x0
+.text
+    0x1 message 0x2 strlen x03
+-------------
+file2.asm
+-------------
+.global strlen
+.data
+    sum: 69
+.text
+strlen:
+    push 1
+    push 2
+    add
+ret
+-------------
+
+file2.o
+-------------
+.symtab
+    value size type bind   section name
+    0     8    FUNC GLOBAL 1       strlen
+    0     2    VAR  LOCAL  2       sum
+.text
+    0x1 0x1 0x0 0x1 0x2 0x0 0x3 0x4
+-------------
+
+
+
+executable
+-------------
+.data
+.text
