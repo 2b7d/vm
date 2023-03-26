@@ -1,16 +1,16 @@
-program -> text_statement?
-           data_statement?
-           global_statement*
-           extern_statement*
+program -> text_section?
+           data_section?
+           globals_declaration*
+           externs_declaration*
            EOF
 
-func_declaration -> symbol ":" (opcode | symbol | number | string)*
-var_declaration  -> symbol ":" (define_byte | define_word)+
+text_section -> "section" "text" func_declaration*
+data_section -> "section" "data" var_declaration*
 
-text_statement   -> "section" "text" func_declaration*
-data_statement   -> "section" "data" var_declaration*
-global_statement -> "global" symbol_list
-extern_statement -> "extern" symbol_list
+func_declaration    -> symbol ":" (opcode | symbol | number | string)*
+var_declaration     -> symbol ":" (define_byte | define_word)+
+globals_declaration -> "global" symbol_list
+externs_declaration -> "extern" symbol_list
 
 define_byte -> "db" (string | number)+
 define_word -> number+
