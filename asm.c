@@ -73,6 +73,7 @@ struct symbol {
         size_t len;
         size_t value;
         size_t size;
+        size_t tpos;
         int isresolved;
         enum symbol_bind bind;
         enum symbol_type type;
@@ -222,6 +223,7 @@ struct symbol *symbol_add(struct symbol_array *syms, char *name, size_t len)
         s->len = len;
         s->value = 0;
         s->size = 0;
+        s->tpos = 0;
         s->isresolved = 0;
         s->bind = BIND_UNDEF;
         s->type = TYPE_UNDEF;
@@ -275,25 +277,15 @@ struct token *compile_var_declaration(struct compiler *c, size_t *size)
 
                 if (tok_next(c, TOK_STR) == 1) {
                         t = tok_advance(c);
-                        for (size_t i = 0; i < t->len; ++i) {
-                                *size += 1;
-                                fwrite(t->start+i, sizeof(uint8_t), 1, c->out);
-                        }
+                        *size += t->len;
+                        fwrite(t->start, 1, t->len, c->out);
                         continue;
                 }
 
                 if (tok_next(c, TOK_NUM) == 1) {
                         t = tok_advance(c);
                         *size += valuesize;
-                        if (valuesize == 1) {
-                                fwrite(&t->value, sizeof(uint8_t), 1, c->out);
-                        } else {
-                                char lsb = t->value,
-                                     msb = t->value >> 8;
-
-                                fwrite(&lsb, sizeof(uint8_t), 1, c->out);
-                                fwrite(&msb, sizeof(uint8_t), 1, c->out);
-                        }
+                        fwrite(&t->value, valuesize, 1, c->out);
                         continue;
                 }
 
@@ -303,7 +295,8 @@ struct token *compile_var_declaration(struct compiler *c, size_t *size)
         return decl;
 }
 
-struct token *compile_func_declaration(struct compiler *c, size_t *size)
+struct token *compile_func_declaration(struct compiler *c,
+                                       struct symbol_array *syms, size_t *size)
 {
         struct token *t, *prev, *decl;
 
@@ -316,7 +309,11 @@ struct token *compile_func_declaration(struct compiler *c, size_t *size)
         prev = tok_peek(c);
 
         for (;;) {
-                char op;
+                uint16_t op;
+                uint8_t op8;
+                struct symbol *s;
+                size_t valuesize = 2;
+
                 t = tok_advance(c);
 
                 if (t->kind < TOK_NUM || t->kind > TOK_SYMBOL) {
@@ -326,16 +323,10 @@ struct token *compile_func_declaration(struct compiler *c, size_t *size)
                 switch (t->kind) {
                 case TOK_NUM:
                         if (prev->kind == TOK_OPCODE && isbyteop(prev) == 1) {
-                                *size += 1;
-                                fwrite(&t->value, sizeof(uint8_t), 1, c->out);
-                        } else {
-                                char lsb = t->value,
-                                     msb = t->value >> 8;
-
-                                fwrite(&lsb, sizeof(uint8_t), 1, c->out);
-                                fwrite(&msb, sizeof(uint8_t), 1, c->out);
-                                *size += 2;
+                                valuesize = 1;
                         }
+                        *size += valuesize;
+                        fwrite(&t->value, valuesize, 1, c->out);
                         break;
 
                 case TOK_STR:
@@ -344,20 +335,26 @@ struct token *compile_func_declaration(struct compiler *c, size_t *size)
                                 exit(1);
                         }
                         *size += 1;
-                        fwrite(t->start, sizeof(uint8_t), 1, c->out);
+                        fwrite(t->start, 1, 1, c->out);
                         break;
 
                 case TOK_OPCODE:
-                        op = (1 << 7) | t->value;
+                        op8 = (1 << 7) | t->value;
 
                         *size += 1;
-                        fwrite(&op, sizeof(uint8_t), 1, c->out);
+                        fwrite(&op8, 1, 1, c->out);
                         break;
 
                 case TOK_SYMBOL:
                         op = 0;
+                        s = symbol_get(syms, t->start, t->len);
+                        if (s == NULL) {
+                            s = symbol_add(syms, t->start, t->len);
+                            s->bind = BIND_LOCAL;
+                        }
+                        s->tpos = *size;
                         *size += 2;
-                        fwrite(&op, sizeof(uint8_t), 1, c->out);
+                        fwrite(&op, 2, 1, c->out);
                         break;
 
                 default:
@@ -384,10 +381,10 @@ void compile_section(struct compiler *c, struct symbol_array *syms,
 
         if (section == TOK_DATA) {
                 type = TYPE_VAR;
-                fwrite(".data", sizeof(uint8_t), 5, c->out);
+                fwrite(".data", 1, 5, c->out);
         } else {
                 type = TYPE_FUNC;
-                fwrite(".text", sizeof(uint8_t), 5, c->out);
+                fwrite(".text", 1, 5, c->out);
         }
 
         for (;;) {
@@ -398,7 +395,7 @@ void compile_section(struct compiler *c, struct symbol_array *syms,
                 if (section == TOK_DATA) {
                         decl = compile_var_declaration(c, &size);
                 } else {
-                        decl = compile_func_declaration(c, &size);
+                        decl = compile_func_declaration(c, syms, &size);
                 }
 
                 if (decl == NULL) {
@@ -654,7 +651,7 @@ int main(int argc, char **argv)
                 }
         }
 
-        fwrite(".symtab", sizeof(uint8_t), 7, c.out);
+        fwrite(".symtab", 1, 7, c.out);
         for (size_t i = 0; i < syms.size; ++i) {
                 struct symbol *s = syms.buf + i;
 
@@ -667,14 +664,13 @@ int main(int argc, char **argv)
                         exit(1);
                 }
 
-                fwrite(&s->value, sizeof(uint16_t), 1, c.out);
-                fwrite(&s->size, sizeof(uint16_t), 1, c.out);
-                fwrite(&s->type, sizeof(uint8_t), 1, c.out);
-                fwrite(&s->bind, sizeof(uint8_t), 1, c.out);
-                fwrite(&s->len, sizeof(uint16_t), 1, c.out);
-                for (size_t j = 0; j < s->len; ++j) {
-                        fwrite(s->name + j, sizeof(uint8_t), 1, c.out);
-                }
+                fwrite(&s->value, 2, 1, c.out);
+                fwrite(&s->size, 2, 1, c.out);
+                fwrite(&s->tpos, 2, 1, c.out);
+                fwrite(&s->type, 1, 1, c.out);
+                fwrite(&s->bind, 1, 1, c.out);
+                fwrite(&s->len, 2, 1, c.out);
+                fwrite(s->name, 1, s->len, c.out);
         }
 
         fclose(c.out);
