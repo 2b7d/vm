@@ -64,6 +64,7 @@ enum symbol_bind {
 
 enum symbol_type {
     TYPE_UNDEF,
+    TYPE_REF,
     TYPE_VAR,
     TYPE_FUNC
 };
@@ -77,6 +78,7 @@ struct symbol {
     int isresolved;
     enum symbol_bind bind;
     enum symbol_type type;
+    struct token *declref;
 };
 
 struct symbol_array {
@@ -202,7 +204,8 @@ struct symbol *symbol_get(struct symbol_array *syms, char *name, size_t len)
 
     for (size_t i = 0; i < syms->size; ++i) {
         s = syms->buf + i;
-        if (s->len == len && memcmp(name, s->name, s->len) == 0) {
+        if (s->len == len && memcmp(name, s->name, s->len) == 0
+                && s->type != TYPE_REF) {
             return s;
         }
     }
@@ -226,6 +229,7 @@ struct symbol *symbol_add(struct symbol_array *syms, char *name, size_t len)
     s->isresolved = 0;
     s->bind = BIND_UNDEF;
     s->type = TYPE_UNDEF;
+    s->declref = NULL;
 
     return s;
 }
@@ -340,17 +344,19 @@ struct token *compile_func_declaration(struct compiler *c,
 
         case TOK_OPCODE:
             op8 = (1 << 7) | t->value;
+            if (isbyteop(t) == 1) {
+                op8 = t->value;
+            }
             *size += 1;
             fwrite(&op8, 1, 1, c->out);
             break;
 
         case TOK_SYMBOL:
             op = 0;
-            s = symbol_get(syms, t->start, t->len);
-            if (s == NULL) {
-                s = symbol_add(syms, t->start, t->len);
-                s->bind = BIND_LOCAL;
-            }
+            s = symbol_add(syms, t->start, t->len);
+            s->type = TYPE_REF;
+            s->isresolved = 0;
+            s->declref = decl;
             s->tpos = *size;
             *size += 2;
             fwrite(&op, 2, 1, c->out);
@@ -640,6 +646,22 @@ int main(int argc, char **argv)
             printf("unexpected token %.*s\n", (int) t->len, t->start);
             exit(1);
         }
+    }
+
+    for (size_t i = 0; i < syms.size; ++i) {
+        struct symbol *sdef, *s = syms.buf + i;
+
+        if (s->type != TYPE_REF) {
+            continue;
+        }
+
+        sdef = symbol_get(&syms, s->declref->start, s->declref->len);
+        if (sdef == NULL) {
+            fprintf(stderr, "something is wrong\n");
+            exit(1);
+        }
+        s->tpos += sdef->value;
+        s->isresolved = 1;
     }
 
     fwrite(".symtab", 1, 7, c.out);
