@@ -7,7 +7,7 @@ flags="-Werror=declaration-after-statement -Wall -Wextra -pedantic -std=c99 -g"
 libs=""
 files=""
 
-if [ "$name" = "asm" ] || [ "$name" = "preproc" ]; then
+if [ "$name" = "asm" ] || [ "$name" = "preproc" ] || [ "$name" = "ld" ]; then
     libs="-I/home/fosseddy/programming/c-sandbox/mem -L/home/fosseddy/programming/c-sandbox/mem -lmem"
     files="util.c"
 fi
