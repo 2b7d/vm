@@ -17,7 +17,7 @@ define_word -> number+
 symbol_list -> symbol ("," symbol)*
 
 symbol -> char (char | digit)*
-opcode -> char (char | digit)*
+opcode -> char+ "8"?
 number -> digit+
 string -> ""<any except """>*""
 
