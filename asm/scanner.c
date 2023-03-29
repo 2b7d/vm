@@ -1,56 +1,55 @@
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 
 #include "scanner.h"
 #include "../vm.h" // TODO: make path absolute
 
-struct ident {
-    char *name;
-    enum token_kind kind;
+static char *keywords_str[KWD_COUNT] = {
+    [TOK_DB]      = "db",
+    [TOK_EXTERN]  = "extern",
+    [TOK_GLOBAL]  = "global",
+    [TOK_SECTION] = "section",
+    [TOK_TEXT]    = "text",
+    [TOK_DATA]    = "data"
 };
 
-struct ident identifiers[IDENT_COUNT] = {
-    { .kind = TOK_DB,       .name = "db"      },
-    { .kind = TOK_EXTERN,   .name = "extern"  },
-    { .kind = TOK_GLOBAL,   .name = "global"  },
-    { .kind = TOK_SECTION,  .name = "section" },
-    { .kind = TOK_TEXT,     .name = "text"    },
-    { .kind = TOK_DATA,     .name = "data"    },
-    { .kind = TOK_ST,       .name = "st"      },
-    { .kind = TOK_LD,       .name = "ld"      },
-    { .kind = TOK_ADD,      .name = "add"     },
-    { .kind = TOK_SUB,      .name = "sub"     },
-    { .kind = TOK_MUL,      .name = "mul"     },
-    { .kind = TOK_DIV,      .name = "div"     },
-    { .kind = TOK_MOD,      .name = "mod"     },
-    { .kind = TOK_INC,      .name = "inc"     },
-    { .kind = TOK_DEC,      .name = "dec"     },
-    { .kind = TOK_PUSH,     .name = "push"    },
-    { .kind = TOK_DUP,      .name = "dup"     },
-    { .kind = TOK_OVER,     .name = "over"    },
-    { .kind = TOK_SWAP,     .name = "swap"    },
-    { .kind = TOK_DROP,     .name = "drop"    },
-    { .kind = TOK_RSPUSH,   .name = "rspush"  },
-    { .kind = TOK_RSPOP,    .name = "rspop"   },
-    { .kind = TOK_RSCOPY,   .name = "rscopy"  },
-    { .kind = TOK_RSDROP,   .name = "rsdrop"  },
-    { .kind = TOK_RSP,      .name = "rsp"     },
-    { .kind = TOK_RSPSET,   .name = "rspset"  },
-    { .kind = TOK_BRK,      .name = "brk"     },
-    { .kind = TOK_BRKSET,   .name = "brkset"  },
-    { .kind = TOK_EQ,       .name = "eq"      },
-    { .kind = TOK_GT,       .name = "gt"      },
-    { .kind = TOK_LT,       .name = "lt"      },
-    { .kind = TOK_OR,       .name = "or"      },
-    { .kind = TOK_AND,      .name = "and"     },
-    { .kind = TOK_NOT,      .name = "not"     },
-    { .kind = TOK_JMP,      .name = "jmp"     },
-    { .kind = TOK_JMPIF,    .name = "jmpif"   },
-    { .kind = TOK_HALT,     .name = "halt"    },
-    { .kind = TOK_SYSCALL,  .name = "syscall" },
-    { .kind = TOK_CALL,     .name = "call"    },
-    { .kind = TOK_RET,      .name = "ret"     }
+static char *opcodes_str[OP_COUNT] = {
+    [OP_ST]      = "st",
+    [OP_LD]      = "ld",
+    [OP_ADD]     = "add",
+    [OP_SUB]     = "sub",
+    [OP_MUL]     = "mul",
+    [OP_DIV]     = "div",
+    [OP_MOD]     = "mod",
+    [OP_INC]     = "inc",
+    [OP_DEC]     = "dec",
+    [OP_PUSH]    = "push",
+    [OP_DUP]     = "dup",
+    [OP_OVER]    = "over",
+    [OP_SWAP]    = "swap",
+    [OP_DROP]    = "drop",
+    [OP_RSPUSH]  = "rspush",
+    [OP_RSPOP]   = "rspop",
+    [OP_RSCOPY]  = "rscopy",
+    [OP_RSDROP]  = "rsdrop",
+    [OP_RSP]     = "rsp",
+    [OP_RSPSET]  = "rspset",
+    [OP_BRK]     = "brk",
+    [OP_BRKSET]  = "brkset",
+    [OP_EQ]      = "eq",
+    [OP_GT]      = "gt",
+    [OP_LT]      = "lt",
+    [OP_OR]      = "or",
+    [OP_AND]     = "and",
+    [OP_NOT]     = "not",
+    [OP_JMP]     = "jmp",
+    [OP_JMPIF]   = "jmpif",
+    [OP_HALT]    = "halt",
+    [OP_SYSCALL] = "syscall",
+    [OP_CALL]    = "call",
+    [OP_RET]     = "ret"
 };
 
 static int is_byteop(struct token *t)
@@ -58,23 +57,40 @@ static int is_byteop(struct token *t)
     return t->start[t->len - 1] == '8';
 }
 
-static int find_identifier(struct token *t)
+static int check_opcode(struct token *t)
 {
     size_t len = t->len;
 
     if (is_byteop(t) == 1) {
         len--;
+        t->is_byteop = 1;
     }
 
-    for (int i = 0; i < IDENT_COUNT; ++i) {
-        struct ident *id = identifiers + i;
+    for (int i = 0; i < OP_COUNT; ++i) {
+        char *op = opcodes_str[i];
 
-        if (len == strlen(id->name) && memcmp(id->name, t->start, len) == 0) {
-            return id->kind;
+        if (len == strlen(op) && memcmp(op, t->start, len) == 0) {
+            t->kind = TOK_OPCODE;
+            t->opcode = i;
+            return 1;
         }
     }
 
-    return -1;
+    return 0;
+}
+
+static int check_keyword(struct token *t)
+{
+    for (int i = 0; i < KWD_COUNT; ++i) {
+        char *kwd = keywords_str[i];
+
+        if (t->len == strlen(kwd) && memcmp(kwd, t->start, t->len) == 0) {
+            t->kind = i;
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 static char peek(struct scanner *s)
@@ -139,8 +155,7 @@ static void make_token(struct scanner *s, struct token *t, enum token_kind k)
 
 static void scan_string(struct scanner *s, struct token *t)
 {
-    while (advance(s) != '"' && has_src(s) == 1) {
-    }
+    while (advance(s) != '"' && has_src(s) == 1);
 
     if (has_src(s) == 0) {
         fprintf(stderr, "unterminated string literal");
@@ -162,18 +177,17 @@ static void scan_number(struct scanner *s, struct token *t)
 
 static void scan_identifier(struct scanner *s, struct token *t)
 {
-    int kind;
-
     while (is_alnum(peek(s)) == 1) {
         advance(s);
     }
 
     make_token(s, t, TOK_SYMBOL);
 
-    kind = find_identifier(t);
-    if (kind >= 0) {
-        t->kind = kind;
+    if (check_opcode(t) == 1) {
+        return;
     }
+
+    check_keyword(t);
 }
 
 void scan_token(struct scanner *s, struct token *t)

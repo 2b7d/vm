@@ -1,48 +1,45 @@
 #include <stdio.h>
+#include <stdint.h>
 
 #include "scanner.h"
+#include "compiler.h"
 #include "../util.h" // TODO: make path absolute
-#include "mem.h" // lib
 
-struct token_array {
-    size_t size;
-    size_t cap;
-    struct token *buf;
-};
+#include "mem.h" // lib
 
 int main(int argc, char **argv)
 {
-    struct token_array toks;
     struct scanner s;
+    struct parser p;
+    struct chunk_array ca;
 
     argc--;
     argv++;
 
     if (argc < 1) {
-        puts("assembly file is required\n");
+        fprintf(stderr, "assembly file is required\n");
         return 1;
     }
 
     scanner_init(&s, read_file(*argv)); // LEAK: os is freeing
-    meminit(&toks, sizeof(struct token), 32); // LEAK: os is freeing
+    parser_init(&p, &s); // LEAK: os is freeing
+    meminit(&ca, sizeof(struct chunk), 0); // LEAK: os is freeing
 
-    for (;;) {
-        struct token *t;
+    compile(&p, &ca);
 
-        memgrow(&toks, sizeof(struct token));
-        t = toks.buf + toks.size;
-        toks.size++;
+    for (size_t i = 0; i < ca.size; ++i) {
+        struct chunk *c = ca.buf + i;
 
-        scan_token(&s, t);
-        if (t->kind == TOK_EOF) {
-            break;
+        printf("name: %u\n", c->name);
+        printf("    size: %lu\n", c->data.size);
+        printf("    data: {");
+        for (size_t j = 0; j < c->data.size; ++j) {
+            printf("%x", c->data.buf[j]);
+            if (j < c->data.size - 1) {
+                printf(", ");
+            }
         }
-    }
-
-    for (size_t i = 0; i < toks.size; ++i) {
-        struct token *t = toks.buf + i;
-
-        printf("%3u -> %.*s\n", t->kind, (int) t->len, t->start);
+        printf("}\n");
     }
 
     return 0;

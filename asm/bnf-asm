@@ -8,12 +8,12 @@ text_section -> "section" "text" func_declaration*
 data_section -> "section" "data" var_declaration*
 
 func_declaration    -> symbol ":" (opcode | symbol | number | string)*
-var_declaration     -> symbol ":" (define_byte | define_word)+
+var_declaration     -> symbol ":" (byte_size | word_size)+
 globals_declaration -> "global" symbol_list
 externs_declaration -> "extern" symbol_list
 
-define_byte -> "db" (string | number)+
-define_word -> number+
+byte_size -> "db" (string | number)+
+word_size -> number+
 symbol_list -> symbol ("," symbol)*
 
 symbol -> char (char | digit)*

@@ -10,7 +10,7 @@ files=""
 
 if [ "$name" = "asm" ]; then
     name="asm.out"
-    files="./asm/main.c ./asm/scanner.c util.c"
+    files="./asm/main.c ./asm/scanner.c ./asm/compiler.c util.c"
     incl="-I/home/fosseddy/programming/c-sandbox/mem"
     libs="-L/home/fosseddy/programming/c-sandbox/mem -lmem"
 fi
