@@ -8,14 +8,21 @@ libs=""
 incl=""
 files=""
 
-if [ "$name" = "asm" ]; then
-    name="asm.out"
-    files="./asm/main.c ./asm/scanner.c ./asm/compiler.c util.c"
+if [ "$name" = "assembler" ]; then
+    name="asm"
+    files="./assembler/*.c util.c"
     incl="-I/home/fosseddy/programming/c-sandbox/mem"
     libs="-L/home/fosseddy/programming/c-sandbox/mem -lmem"
 fi
 
-if [ "$name" = "preproc" ] || [ "$name" = "ld" ]; then
+if [ "$name" = "linker" ]; then
+    name="ld"
+    files="./linker/*.c"
+    #incl="-I/home/fosseddy/programming/c-sandbox/mem"
+    #libs="-L/home/fosseddy/programming/c-sandbox/mem -lmem"
+fi
+
+if [ "$name" = "preproc" ]; then
     incl="-I/home/fosseddy/programming/c-sandbox/mem"
     libs="-L/home/fosseddy/programming/c-sandbox/mem -lmem"
     files="$name.c util.c"

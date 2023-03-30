@@ -1,0 +1,25 @@
+Object file format:
+    nsyms nrels data_size
+    -- symbols --
+    -- relocations --
+    -- data --
+
+1st line:
+    number of symbols, relocations
+    size of data
+    if none then value is 0
+
+symbols:
+    name value type
+        name  - name of symbol
+        value - symbol file-relative address
+        type  - "D" for defined or "U" for undefined
+    symbols are numbered in the order they are listed, starting at 1
+
+relocations:
+    loc ref
+        loc  - location to be relocated
+        ref  - symbol number
+
+data:
+    instruction bytes
