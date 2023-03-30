@@ -28,6 +28,10 @@ if [ "$name" = "preproc" ]; then
     files="$name.c util.c"
 fi
 
+if [ "$name" = "vm" ]; then
+    files="vm.c"
+fi
+
 if [ "$2" = "prod" ]; then
     flags=${flags/-g/-O2}
 fi
