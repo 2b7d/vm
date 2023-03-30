@@ -1,7 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-#include "mem.h"
+#include "mem.h" // lib
 
 struct header {
     unsigned short nsyms;
@@ -12,14 +16,8 @@ struct header {
 struct symbol {
     unsigned short number;
     unsigned short value;
-    unsigned char name[256];
+    unsigned char *name;
     enum { TYPE_UNDEF, TYPE_DEF } type;
-};
-
-struct symbol_array {
-    unsigned long size;
-    unsigned long cap;
-    struct symbol *buf;
 };
 
 struct relocation {
@@ -33,130 +31,152 @@ struct relocation_array {
     struct relocation *buf;
 };
 
-static void read_bytes(void *buf, size_t size, FILE *f)
+struct symbol_array {
+    unsigned long size;
+    unsigned long cap;
+    struct symbol *buf;
+};
+
+struct module {
+    unsigned char *name;
+
+    unsigned char *data;
+
+    unsigned char *src;
+    unsigned char *cur;
+    unsigned long size;
+
+    struct header h;
+
+    struct symbol_array sa;
+    struct relocation_array ra;
+};
+
+static void module_init(struct module *m, char *pathname)
 {
-    fread(buf, size, 1, f);
-    if (ferror(f) != 0) {
-        fprintf(stderr, "read failed\n");
+    int fd;
+    struct stat statbuf;
+
+    fd = open(pathname, O_RDONLY);
+    if (fd < 0) {
+        perror("failed to open file");
         exit(1);
     }
+
+    if (fstat(fd, &statbuf) < 0) {
+        perror("failed to get file info");
+        exit(1);
+    }
+
+    m->size = statbuf.st_size;
+    m->src = malloc(m->size);
+    if (m->src == NULL) {
+        perror("malloc failed");
+        exit(1);
+    }
+
+    if (read(fd, m->src, m->size) < 0) {
+        perror("read failed");
+        exit(1);
+    }
+
+    close(fd);
+
+    m->name = (unsigned char *) pathname;
+    m->cur = m->src;
 }
 
-static void read_separator(FILE *f)
+static void read_separator(struct module *m)
 {
-    unsigned char c;
-
-    read_bytes(&c, sizeof(c), f);
-    if (c != '\n') {
+    if (*m->cur++ != '\n') {
         fprintf(stderr, "expected separator\n");
         exit(1);
     }
 }
 
-static void read_header(struct header *h, FILE *f)
+static void read_bytes(struct module *m, void *dest, unsigned long size)
 {
-    read_bytes(&h->nsyms, sizeof(h->nsyms), f);
-    read_bytes(&h->nrels, sizeof(h->nrels), f);
-    read_bytes(&h->ndata, sizeof(h->ndata), f);
-
-    read_separator(f);
+    memcpy(dest, m->cur, size);
+    m->cur += size;
 }
 
-static void read_symbol(struct symbol *s, FILE *f)
+static void read_header(struct module *m)
 {
-    unsigned short i = 0;
-    unsigned char c;
+    read_bytes(m, &m->h.nsyms, 2);
+    read_bytes(m, &m->h.nrels, 2);
+    read_bytes(m, &m->h.ndata, 2);
 
-    for (;;) {
-        read_bytes(&c, sizeof(c), f);
-
-        if (i >= sizeof(s->name)) {
-            fprintf(stderr, "symbol name is t0o long\n");
-            exit(1);
-        }
-
-        s->name[i++] = c;
-        if (c == '\0') {
-            break;
-        }
-    }
-
-    read_bytes(&s->value, sizeof(s->value), f);
-
-    read_bytes(&c, sizeof(c), f);
-    switch (c) {
-    case 'D':
-        s->type = TYPE_DEF;
-        break;
-
-    case 'U':
-        s->type = TYPE_UNDEF;
-        break;
-
-    default:
-        fprintf(stderr, "unknown symbol type\n");
-        exit(1);
-    }
+    read_separator(m);
 }
 
-static void read_symbols(struct symbol_array *sa, struct header *h, FILE *f)
+static void read_symbols(struct module *m)
 {
-    for (unsigned short i = 0; i < h->nsyms; ++i) {
+    for (unsigned short i = 0; i < m->h.nsyms; ++i) {
         struct symbol *s;
 
-        memgrow(sa, sizeof(struct symbol));
-        s = sa->buf + sa->size;
-        sa->size++;
+        memgrow(&m->sa, sizeof(struct symbol));
+        s = m->sa.buf + m->sa.size;
+        m->sa.size++;
 
         s->number = i + 1;
-        read_symbol(s, f);
+        s->name = m->cur;
+        m->cur += strlen((char *) m->cur) + 1;
+
+        read_bytes(m, &s->value, 2);
+
+        switch (*m->cur++) {
+        case 'D':
+            s->type = TYPE_DEF;
+            break;
+
+        case 'U':
+            s->type = TYPE_UNDEF;
+            break;
+
+        default:
+            fprintf(stderr, "unknown symbol type\n");
+            exit(1);
+        }
     }
 
-    read_separator(f);
+    read_separator(m);
 }
 
-static void read_relocations(struct relocation_array *ra, struct header *h,
-                             FILE *f)
+static void read_relocations(struct module *m)
 {
-    for (unsigned short i = 0; i < h->nrels; ++i) {
+    for (unsigned short i = 0; i < m->h.nrels; ++i) {
         struct relocation *r;
 
-        memgrow(ra, sizeof(struct relocation));
-        r = ra->buf + ra->size;
-        ra->size++;
+        memgrow(&m->ra, sizeof(struct relocation));
+        r = m->ra.buf + m->ra.size;
+        m->ra.size++;
 
-        read_bytes(&r->loc, sizeof(r->loc), f);
-        read_bytes(&r->ref, sizeof(r->ref), f);
+        read_bytes(m, &r->loc, 2);
+        read_bytes(m, &r->ref, 2);
     }
 
-    read_separator(f);
+    read_separator(m);
 }
 
-static unsigned char *read_data(unsigned long size, FILE *f)
+static void read_data(struct module *m)
 {
-    unsigned char *data;
-
-    if (size == 0) {
-        return NULL;
+    if (m->h.ndata == 0) {
+        m->data = NULL;
+        return;
     }
 
-    data = malloc(size);
-    if (data == NULL) {
+    m->data = malloc(m->h.ndata);
+    if (m->data == NULL) {
         perror("malloc failed");
         exit(1);
     }
 
-    read_bytes(data, size, f);
-    return data;
+    read_bytes(m, m->data, m->h.ndata);
 }
 
 int main(int argc, char **argv)
 {
-    FILE *f;
-    struct symbol_array sa;
-    struct relocation_array ra;
-    struct header h;
-    unsigned char *data;
+    struct module m;
 
     argc--;
     argv++;
@@ -166,42 +186,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    meminit(&sa, sizeof(struct symbol), 16); // LEAK: os is freeing
-    meminit(&ra, sizeof(struct relocation), 16); // LEAK: os is freeing
+    module_init(&m, *argv); // LEAK: os is freeing
+    meminit(&m.sa, sizeof(struct symbol), 16); // LEAK: os is freeing
+    meminit(&m.ra, sizeof(struct symbol), 16); // LEAK: os is freeing
 
-    f = fopen(*argv, "r");
-    if (f == NULL) {
-        perror("fopen failed");
-        return 1;
-    }
-
-    read_header(&h, f);
-    read_symbols(&sa, &h, f);
-    read_relocations(&ra, &h, f);
-    data = read_data(h.ndata * sizeof(unsigned char), f);
-
-    printf("nsyms: %d, nrels: %d, ndata: %d\n", h.nsyms, h.nrels, h.ndata);
-
-    for (unsigned long i = 0; i < sa.size; ++i) {
-        struct symbol *s = sa.buf + i;
-        printf("%u %s %u %u\n", s->number, s->name, s->value, s->type);
-    }
-
-    for (unsigned long i = 0; i < ra.size; ++i) {
-        struct relocation *r = ra.buf + i;
-        printf("%u %u\n", r->loc, r->ref);
-    }
-
-    if (data != NULL) {
-        printf("{");
-        for (unsigned short i = 0; i < h.ndata; ++i) {
-            printf("%2x", data[i]);
-            if (i < h.ndata - 1) {
-                printf(", ");
-            }
-        }
-        printf("}\n");
-    }
+    read_header(&m);
+    read_symbols(&m);
+    read_relocations(&m);
+    read_data(&m);
 
     return 0;
 }
