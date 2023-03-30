@@ -18,8 +18,8 @@ fi
 if [ "$name" = "linker" ]; then
     name="ld"
     files="./linker/*.c"
-    #incl="-I/home/fosseddy/programming/c-sandbox/mem"
-    #libs="-L/home/fosseddy/programming/c-sandbox/mem -lmem"
+    incl="-I/home/fosseddy/programming/c-sandbox/mem"
+    libs="-L/home/fosseddy/programming/c-sandbox/mem -lmem"
 fi
 
 if [ "$name" = "preproc" ]; then

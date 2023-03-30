@@ -1,25 +1,31 @@
 Object file format:
-    nsyms nrels data_size
-    -- symbols --
-    -- relocations --
+    -- header --\n
+    -- symbols --\n
+    -- relocations --\n
     -- data --
 
-1st line:
-    number of symbols, relocations
-    size of data
-    if none then value is 0
+each section is a continuous sequence of bytes separated by \n
+
+header:
+    nsyms nrels ndata
+        nsyms - 2 bytes number of symbols
+        nrels - 2 bytes number of relocations
+        ndata - 2 bytes size of data
+
+    if no symbols or relocations then value is 0
 
 symbols:
     name value type
-        name  - name of symbol
-        value - symbol file-relative address
-        type  - "D" for defined or "U" for undefined
+        name  - null-terminated name of symbol
+        value - 2 bytes         symbol file-relative address
+        type  - 1 byte          "D" for defined or "U" for undefined
+
     symbols are numbered in the order they are listed, starting at 1
 
 relocations:
     loc ref
-        loc  - location to be relocated
-        ref  - symbol number
+        loc - 2 bytes location to be relocated
+        ref - 2 bytes symbol number
 
 data:
-    instruction bytes
+    instructions bytes
