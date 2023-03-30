@@ -1,10 +1,10 @@
 Object file format:
-    -- header --\n
-    -- symbols --\n
-    -- relocations --\n
-    -- data --
+    header \n
+    symbols \n
+    relocations \n
+    data
 
-each section is a continuous sequence of bytes separated by 1 byte \n
+each section is a continuous sequence of bytes separated by \n
 
 header:
     nsyms nrels ndata
@@ -12,19 +12,21 @@ header:
         nrels - 2 bytes number of relocations
         ndata - 2 bytes size of data
 
-    if no symbols or relocations then value is 0
+    if section is empty then value is 0
 
 symbols:
     name value type
         name  - null-terminated name of symbol
         value - 2 bytes         symbol file-relative address
-        type  - 1 byte          "D" for defined or "U" for undefined
+        type  - 1 byte          0 - local
+                                1 - global
+                                2 - extern
 
-    symbols are numbered in the order they are listed, starting at 1
+    symbols are numbered in the order they are listed, starting at 0
 
 relocations:
     loc ref
-        loc - 2 bytes location to be relocated
+        loc - 2 bytes data location to be relocated
         ref - 2 bytes symbol number
 
 data:
