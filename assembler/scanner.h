@@ -2,19 +2,15 @@
 // #include <stdint.h>
 
 enum token_kind {
-    // keywords must be zero aligned to be used as array indices
-    TOK_DB,
+    TOK_BYTES,
     TOK_EXTERN,
     TOK_GLOBAL,
-    TOK_SECTION,
-    TOK_TEXT,
-    TOK_DATA,
-    KWD_COUNT,
 
-    TOK_NUM,
-    TOK_STR,
     TOK_SYMBOL,
     TOK_OPCODE,
+    TOK_OPCODE_BYTE,
+    TOK_NUM,
+    TOK_STR,
 
     TOK_COMMA,
     TOK_COLON,
@@ -25,8 +21,6 @@ struct token {
     enum token_kind kind;
     char *start;
     size_t len;
-    uint8_t opcode;
-    int is_byteop;
 };
 
 struct scanner {
