@@ -21,15 +21,15 @@ int main(int argc, char **argv)
     }
 
     scanner_init(&s, read_file(*argv)); // LEAK: os is freeing
-    meminit(&p.toks, sizeof(struct token), 32); // LEAK: os is freeing
-    meminit(&p.sa, sizeof(struct sym), 16); // LEAK: os is freeing
-    meminit(&p.ra, sizeof(struct rel), 16); // LEAK: os is freeing
-    meminit(&p.code, sizeof(uint8_t), 16); // LEAK: os is freeing
+    meminit((struct mem *) &p.toks, sizeof(struct token), 32); // LEAK: os is freeing
+    meminit((struct mem *) &p.sa, sizeof(struct sym), 16); // LEAK: os is freeing
+    meminit((struct mem *) &p.ra, sizeof(struct rel), 16); // LEAK: os is freeing
+    meminit((struct mem *) &p.code, sizeof(uint8_t), 16); // LEAK: os is freeing
 
     for (;;) {
         struct token *t;
 
-        memgrow(&p.toks, sizeof(struct token));
+        memgrow((struct mem *) &p.toks);
         t = p.toks.buf + p.toks.size;
         p.toks.size++;
 

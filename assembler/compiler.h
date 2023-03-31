@@ -3,6 +3,7 @@ enum sym_type { TYPE_LOCAL, TYPE_GLOBAL, TYPE_EXTERN };
 struct token_array {
     size_t size;
     size_t cap;
+    size_t data_size;
     struct token *buf;
 };
 
@@ -18,6 +19,7 @@ struct sym {
 struct sym_array {
     size_t size;
     size_t cap;
+    size_t data_size;
     struct sym *buf;
 };
 
@@ -32,6 +34,7 @@ struct rel {
 struct rel_array {
     size_t size;
     size_t cap;
+    size_t data_size;
     struct rel *buf;
 };
 

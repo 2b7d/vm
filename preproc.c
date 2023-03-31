@@ -44,7 +44,7 @@ void scan(struct scanner *s, struct directive_array *dirs)
         if (s->cur - start-1 == 6 && memcmp(start+1, "define", 6) == 0) {
             struct directive *d;
 
-            memgrow(dirs, sizeof(struct directive));
+            memgrow((struct mem *) dirs);
             d = dirs->buf + dirs->size;
             dirs->size++;
 
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
     s.src = read_file(*argv); // LEAK: os is freeing
     s.cur = s.src;
 
-    meminit(&dirs, sizeof(struct directive), 0); // LEAK: os is freeing
+    meminit((struct mem *) &dirs, sizeof(struct directive), 0); // LEAK: os is freeing
 
     scan(&s, &dirs);
     s.cur = s.src;

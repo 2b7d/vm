@@ -23,6 +23,7 @@ struct symbol {
 struct symbol_array {
     unsigned long size;
     unsigned long cap;
+    unsigned long data_size;
     struct symbol *buf;
 };
 
@@ -34,6 +35,7 @@ struct relocation {
 struct relocation_array {
     unsigned long size;
     unsigned long cap;
+    unsigned long data_size;
     struct relocation *buf;
 };
 
@@ -55,6 +57,7 @@ struct module {
 struct module_array {
     unsigned long size;
     unsigned long cap;
+    unsigned long data_size;
     struct module *buf;
 };
 
@@ -67,6 +70,7 @@ struct gsymbol {
 struct gsymbol_array {
     unsigned long size;
     unsigned long cap;
+    unsigned long data_size;
     struct gsymbol *buf;
 };
 
@@ -84,7 +88,7 @@ static void gsymbol_add(unsigned char *name, unsigned long mod, unsigned long nu
         }
     }
 
-    memgrow(&gsa, sizeof(struct gsymbol));
+    memgrow((struct mem *) &gsa);
     gs = gsa.buf + gsa.size;
     gsa.size++;
 
@@ -168,7 +172,7 @@ static void read_symbols(struct module *m)
     for (unsigned short i = 0; i < m->h.nsyms; ++i) {
         struct symbol *s;
 
-        memgrow(&m->sa, sizeof(struct symbol));
+        memgrow((struct mem *) &m->sa);
         s = m->sa.buf + m->sa.size;
         m->sa.size++;
 
@@ -196,7 +200,7 @@ static void read_relocations(struct module *m)
     for (unsigned short i = 0; i < m->h.nrels; ++i) {
         struct relocation *r;
 
-        memgrow(&m->ra, sizeof(struct relocation));
+        memgrow((struct mem *) &m->ra);
         r = m->ra.buf + m->ra.size;
         m->ra.size++;
 
@@ -274,21 +278,21 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    meminit(&ma, sizeof(struct module), 0); // LEAK: os is freeing
-    meminit(&gsa, sizeof(struct gsymbol), 16); // LEAK: os is freeing
+    meminit((struct mem *) &ma, sizeof(struct module), 0); // LEAK: os is freeing
+    meminit((struct mem *) &gsa, sizeof(struct gsymbol), 16); // LEAK: os is freeing
 
     start = 0;
     module_index = 0;
     while (*argv != NULL) {
         struct module *m;
 
-        memgrow(&ma, sizeof(struct module));
+        memgrow((struct mem *) &ma);
         m = ma.buf + ma.size;
         ma.size++;
 
         module_init(m, *argv); // LEAK: os is freeing
-        meminit(&m->sa, sizeof(struct symbol), 16); // LEAK: os is freeing
-        meminit(&m->ra, sizeof(struct symbol), 16); // LEAK: os is freeing
+        meminit((struct mem *) &m->sa, sizeof(struct symbol), 16); // LEAK: os is freeing
+        meminit((struct mem *) &m->ra, sizeof(struct symbol), 16); // LEAK: os is freeing
 
         m->start = start;
         m->index = module_index;

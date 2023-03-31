@@ -75,7 +75,7 @@ static struct sym *add_symbol(struct parser *p, char *name, size_t len)
     struct sym *s;
     unsigned long index = p->sa.size;
 
-    memgrow(&p->sa, sizeof(struct sym));
+    memgrow((struct mem *) &p->sa);
     s = p->sa.buf + p->sa.size;
     p->sa.size++;
 
@@ -92,7 +92,7 @@ static struct rel *add_rel(struct parser *p, char *name, size_t namelen,
 {
     struct rel *r;
 
-    memgrow(&p->ra, sizeof(struct rel));
+    memgrow((struct mem *) &p->ra);
     r = p->ra.buf + p->ra.size;
     p->ra.size++;
 
@@ -178,7 +178,7 @@ static void symbol_declaration(struct parser *p)
                 valsize = 1;
                 op = t->opcode;
             }
-            memgrow(&p->code, sizeof(uint8_t));
+            memgrow((struct mem *) &p->code);
             p->code.buf[p->code.size++] = op;
 
             if (next_some(p, ks, 3) == 1) {
@@ -189,7 +189,7 @@ static void symbol_declaration(struct parser *p)
                     old_size = p->code.size;
                     value = number(t, valsize == 2 ? USHRT_MAX : UCHAR_MAX);
                     p->code.size += valsize;
-                    memgrow(&p->code, sizeof(uint8_t));
+                    memgrow((struct mem *) &p->code);
                     memcpy(p->code.buf + old_size, &value, valsize);
                     break;
 
@@ -203,7 +203,7 @@ static void symbol_declaration(struct parser *p)
                         exit(1);
                     }
 
-                    memgrow(&p->code, sizeof(uint8_t));
+                    memgrow((struct mem *) &p->code);
                     p->code.buf[p->code.size++] = *start;
                     break;
 
@@ -222,7 +222,7 @@ static void symbol_declaration(struct parser *p)
                     old_size = p->code.size;
                     p->code.size += 2;
                     value = 0;
-                    memgrow(&p->code, sizeof(uint8_t));
+                    memgrow((struct mem *) &p->code);
                     memcpy(p->code.buf + old_size, &value, 2);
                     break;
 
@@ -244,7 +244,7 @@ static void symbol_declaration(struct parser *p)
             }
 
             p->code.size += len;
-            memgrow(&p->code, sizeof(uint8_t));
+            memgrow((struct mem *) &p->code);
             memcpy(p->code.buf + old_size, start, len);
             break;
 
@@ -252,7 +252,7 @@ static void symbol_declaration(struct parser *p)
             old_size = p->code.size;
             value = number(t, USHRT_MAX);
             p->code.size += 2;
-            memgrow(&p->code, sizeof(uint8_t));
+            memgrow((struct mem *) &p->code);
             memcpy(p->code.buf + old_size, &value, 2);
             break;
 
@@ -260,7 +260,7 @@ static void symbol_declaration(struct parser *p)
             while (next(p, TOK_NUM) == 1) {
                 struct token *num = advance(p);
                 value = number(num, UCHAR_MAX);
-                memgrow(&p->code, sizeof(uint8_t));
+                memgrow((struct mem *) &p->code);
                 p->code.buf[p->code.size++] = value;
             }
             break;
