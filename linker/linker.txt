@@ -30,4 +30,4 @@ relocations:
         ref - 2 bytes symbol number
 
 data:
-    instructions bytes
+    compiled bytecode
