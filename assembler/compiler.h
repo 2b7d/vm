@@ -1,6 +1,4 @@
-// #include <stddef.h>
-// #include <stdint.h>
-// #include "scanner.h"
+enum sym_type { TYPE_LOCAL, TYPE_GLOBAL, TYPE_EXTERN };
 
 struct token_array {
     size_t size;
@@ -8,25 +6,45 @@ struct token_array {
     struct token *buf;
 };
 
-struct chunk {
-    enum token_kind name;
-    struct {
-        size_t size;
-        size_t cap;
-        uint8_t *buf;
-    } data;
+struct sym {
+    char *name;
+    size_t namelen;
+    unsigned short value;
+    int is_resolved;
+    enum sym_type type;
+    unsigned long index;
 };
 
-struct chunk_array {
+struct sym_array {
     size_t size;
     size_t cap;
-    struct chunk *buf;
+    struct sym *buf;
+};
+
+struct rel {
+    unsigned short loc;
+    unsigned short ref;
+    int is_resolved;
+    char *name;
+    size_t namelen;
+};
+
+struct rel_array {
+    size_t size;
+    size_t cap;
+    struct rel *buf;
 };
 
 struct parser {
     struct token *cur;
+    struct sym_array sa;
+    struct rel_array ra;
     struct token_array toks;
+    struct {
+        size_t size;
+        size_t cap;
+        uint8_t *buf;
+    } code;
 };
 
-void parser_init(struct parser *p, struct scanner *s);
-void compile(struct parser *p, struct chunk_array *ca);
+void compile(struct parser *p);

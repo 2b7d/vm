@@ -7,24 +7,62 @@
 #include "../vm.h" // TODO: make path absolute
 
 static char *opcodes_str[OP_COUNT] = {
-    "st",    "ld",      "add",    "sub",  "mul",
-    "div",   "mod",     "inc",    "dec",  "push",
-    "dup",   "over",    "swap",   "drop", "rspush",
-    "rspop", "rscopy",  "rsdrop", "rsp",  "rspset",
-    "brk",   "brkset",  "eq",     "gt",   "lt",
-    "or",    "and",     "not",    "jmp",  "jmpif",
-    "halt",  "syscall", "call",   "ret"
+    [OP_ST]      = "st",
+    [OP_LD]      = "ld",
+    [OP_ADD]     = "add",
+    [OP_SUB]     = "sub",
+    [OP_MUL]     = "mul",
+    [OP_DIV]     = "div",
+    [OP_MOD]     = "mod",
+    [OP_INC]     = "inc",
+    [OP_DEC]     = "dec",
+    [OP_PUSH]    = "push",
+    [OP_DUP]     = "dup",
+    [OP_OVER]    = "over",
+    [OP_SWAP]    = "swap",
+    [OP_DROP]    = "drop",
+    [OP_RSPUSH]  = "rspush",
+    [OP_RSPOP]   = "rspop",
+    [OP_RSCOPY]  = "rscopy",
+    [OP_RSDROP]  = "rsdrop",
+    [OP_RSP]     = "rsp",
+    [OP_RSPSET]  = "rspset",
+    [OP_BRK]     = "brk",
+    [OP_BRKSET]  = "brkset",
+    [OP_EQ]      = "eq",
+    [OP_GT]      = "gt",
+    [OP_LT]      = "lt",
+    [OP_OR]      = "or",
+    [OP_AND]     = "and",
+    [OP_NOT]     = "not",
+    [OP_JMP]     = "jmp",
+    [OP_JMPIF]   = "jmpif",
+    [OP_HALT]    = "halt",
+    [OP_SYSCALL] = "syscall",
+    [OP_CALL]    = "call",
+    [OP_RET]     = "ret"
 };
 
 static int check_opcode(struct token *t)
 {
     unsigned long len = t->len;
+    int is_byte = 0;
+
+    if (t->start[len - 1] == '8') {
+        len--;
+        is_byte = 1;
+    }
 
     for (int i = 0; i < OP_COUNT; ++i) {
         char *op = opcodes_str[i];
 
         if (len == strlen(op) && memcmp(op, t->start, len) == 0) {
-            t->kind = TOK_OPCODE;
+            if (is_byte) {
+                t->kind = TOK_OPCODE_BYTE;
+            } else {
+                t->kind = TOK_OPCODE;
+            }
+            t->opcode = i;
             return 1;
         }
     }
@@ -138,34 +176,17 @@ static void scan_number(struct scanner *s, struct token *t)
     make_token(s, t, TOK_NUM);
 }
 
-static void scan_opcode(struct scanner *s, struct token *t)
-{
-    while (is_lower(peek(s)) == 1) {
-        advance(s);
-    }
-
-    make_token(s, t, TOK_OPCODE);
-
-    if (check_opcode(t) == 0) {
-        t->kind = TOK_SYMBOL;
-    }
-
-    if (peek(s) == '8') {
-        advance(s);
-        t->len++;
-        if (t->kind == TOK_OPCODE) {
-            t->kind = TOK_OPCODE_BYTE;
-        }
-    }
-}
-
-static void scan_symbol(struct scanner *s, struct token *t)
+static void scan_identifier(struct scanner *s, struct token *t)
 {
     while (is_char(peek(s)) == 1 || is_digit(peek(s)) == 1) {
         advance(s);
     }
 
     make_token(s, t, TOK_SYMBOL);
+
+    if (check_opcode(t) == 1) {
+        return;
+    }
 }
 
 void scan_token(struct scanner *s, struct token *t)
@@ -212,11 +233,8 @@ scan_again:
         if (is_digit(c) == 1) {
             scan_number(s, t);
             return;
-        } else if (is_lower(c) == 1) {
-            scan_opcode(s, t);
-            return;
         } else if (is_char(c) == 1) {
-            scan_symbol(s, t);
+            scan_identifier(s, t);
             return;
         }
 

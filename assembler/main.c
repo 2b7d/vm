@@ -6,12 +6,11 @@
 #include "../util.h" // TODO: make path absolute
 
 #include "mem.h" // lib
-
+                 //
 int main(int argc, char **argv)
 {
     struct scanner s;
     struct parser p;
-    struct chunk_array ca;
 
     argc--;
     argv++;
@@ -22,25 +21,27 @@ int main(int argc, char **argv)
     }
 
     scanner_init(&s, read_file(*argv)); // LEAK: os is freeing
-    parser_init(&p, &s); // LEAK: os is freeing
-    meminit(&ca, sizeof(struct chunk), 0); // LEAK: os is freeing
+    meminit(&p.toks, sizeof(struct token), 32); // LEAK: os is freeing
+    meminit(&p.sa, sizeof(struct sym), 16); // LEAK: os is freeing
+    meminit(&p.ra, sizeof(struct rel), 16); // LEAK: os is freeing
+    meminit(&p.code, sizeof(uint8_t), 16); // LEAK: os is freeing
 
-    compile(&p, &ca);
+    for (;;) {
+        struct token *t;
 
-    for (size_t i = 0; i < ca.size; ++i) {
-        struct chunk *c = ca.buf + i;
+        memgrow(&p.toks, sizeof(struct token));
+        t = p.toks.buf + p.toks.size;
+        p.toks.size++;
 
-        printf("name: %u\n", c->name);
-        printf("    size: %lu\n", c->data.size);
-        printf("    data: {");
-        for (size_t j = 0; j < c->data.size; ++j) {
-            printf("%x", c->data.buf[j]);
-            if (j < c->data.size - 1) {
-                printf(", ");
-            }
+        scan_token(&s, t);
+        if (t->kind == TOK_EOF) {
+            break;
         }
-        printf("}\n");
     }
+
+    p.cur = p.toks.buf;
+
+    compile(&p);
 
     return 0;
 }

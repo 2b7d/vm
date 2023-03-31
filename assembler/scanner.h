@@ -21,6 +21,7 @@ struct token {
     enum token_kind kind;
     char *start;
     size_t len;
+    int opcode;
 };
 
 struct scanner {
