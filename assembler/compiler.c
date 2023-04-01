@@ -18,6 +18,15 @@ static int has_toks(struct parser *p)
     return peek(p)->kind != TOK_EOF;
 }
 
+static struct token *peek2(struct parser *p)
+{
+    if (has_toks(p) == 1) {
+        return p->cur + 1;
+    }
+
+    return peek(p);
+}
+
 static struct token *advance(struct parser *p)
 {
     struct token *t = peek(p);
@@ -33,6 +42,12 @@ static int next(struct parser *p, enum token_kind k)
 {
     return peek(p)->kind == k;
 }
+
+static int next2(struct parser *p, enum token_kind k)
+{
+    return peek2(p)->kind == k;
+}
+
 
 static int next_some(struct parser *p, enum token_kind *ks, size_t ksize)
 {
@@ -176,7 +191,13 @@ static void opcode_statement(struct parser *p, struct token *opcode)
     emit_bytes(p, &op, 1);
 
     if (next_some(p, expected_kinds, 3) == 1) {
-        struct token *t = advance(p);
+        struct token *t;
+
+        if (next(p, TOK_SYMBOL) == 1 && next2(p, TOK_COLON) == 1) {
+            return;
+        }
+
+        t = advance(p);
 
         switch (t->kind) {
         case TOK_NUM:
@@ -251,6 +272,8 @@ static void symbol_declaration(struct parser *p)
 
 void compile(struct parser *p)
 {
+    p->cur = p->ta.buf;
+
     for (;;) {
         struct token *t;
 
@@ -345,6 +368,4 @@ void parser_init(struct parser *p)
     meminit((struct mem *) &p->sa, sizeof(struct sym), 16);
     meminit((struct mem *) &p->ra, sizeof(struct rel), 16);
     meminit((struct mem *) &p->code, sizeof(uint8_t), 64);
-
-    p->cur = p->ta.buf;
 }
