@@ -8,16 +8,19 @@
 
 struct directive {
     char *start;
-    size_t len;
+    int len;
+
     char *name;
-    size_t namelen;
+    int namelen;
+
     char *value;
-    size_t valuelen;
+    int valuelen;
 };
 
 struct directive_array {
-    size_t size;
-    size_t cap;
+    int size;
+    int cap;
+    int data_size;
     struct directive *buf;
 };
 
@@ -41,7 +44,7 @@ void scan(struct scanner *s, struct directive_array *dirs)
             s->cur++;
         }
 
-        if (s->cur - start-1 == 6 && memcmp(start+1, "define", 6) == 0) {
+        if (s->cur - start - 1 == 6 && memcmp(start + 1, "define", 6) == 0) {
             struct directive *d;
 
             memgrow((struct mem *) dirs);
@@ -89,7 +92,7 @@ void process_directives(char *pathname, struct scanner *s,
         exit(1);
     }
 
-    for (size_t i = 0; i < dirs->size; ++i) {
+    for (int i = 0; i < dirs->size; ++i) {
         struct directive *d = dirs->buf + i;
         char *end = d->start + d->len;
 
@@ -106,7 +109,7 @@ void process_directives(char *pathname, struct scanner *s,
     while (*s->cur != '\0') {
         if (s->cur < last_dir) {
             // remove declaration
-            for (size_t i = 0; i < dirs->size; ++i) {
+            for (int i = 0; i < dirs->size; ++i) {
                 struct directive *d = dirs->buf + i;
 
                 if (s->cur == d->start) {
@@ -116,7 +119,7 @@ void process_directives(char *pathname, struct scanner *s,
             }
         }
 
-        for (size_t i = 0; i < dirs->size; ++i) {
+        for (int i = 0; i < dirs->size; ++i) {
             struct directive *d = dirs->buf + i;
 
             if (*s->cur == *d->name) {
@@ -126,7 +129,7 @@ void process_directives(char *pathname, struct scanner *s,
                     ch++;
                 }
 
-                if ((size_t) (ch - start) == d->namelen &&
+                if (ch - start == d->namelen &&
                         memcmp(start, d->name, d->namelen) == 0) {
                     fwrite(d->value, d->valuelen, 1, f);
                     s->cur = ch;
