@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h>
 #include <string.h>
 #include <stdint.h>
 
 #include "scanner.h"
 #include "compiler.h"
-//#include "../vm.h" // TODO: make path absolute
 
 #include "mem.h" // lib
 
@@ -49,20 +47,22 @@ static int next_some(struct parser *p, enum token_kind *ks, size_t ksize)
 
 static struct token *consume(struct parser *p, enum token_kind k, char *name)
 {
-    if (next(p, k) == 0) {
-        fprintf(stderr, "expected %s\n", name);
+    struct token *t = peek(p);
+
+    if (t->kind != k) {
+        fprintf(stderr, "expected %s, but got %.*s\n", name, t->len, t->lex);
         exit(1);
     }
 
     return advance(p);
 }
 
-static struct sym *find_symbol(struct parser *p, char *name, size_t len)
+static struct sym *find_symbol(struct parser *p, struct token *t)
 {
-    for (unsigned long i = 0; i < p->sa.size; ++i) {
+    for (int i = 0; i < p->sa.size; ++i) {
         struct sym *s = p->sa.buf + i;
 
-        if (len == s->namelen && memcmp(s->name, name, len) == 0) {
+        if (t->len == s->namelen && memcmp(s->name, t->lex, t->len) == 0) {
             return s;
         }
     }
@@ -70,27 +70,33 @@ static struct sym *find_symbol(struct parser *p, char *name, size_t len)
     return NULL;
 }
 
-static struct sym *add_symbol(struct parser *p, char *name, size_t len)
+static struct sym *add_symbol(struct parser *p, struct token *t)
 {
     struct sym *s;
-    unsigned long index = p->sa.size;
+    int index = p->sa.size;
 
     memgrow((struct mem *) &p->sa);
     s = p->sa.buf + p->sa.size;
     p->sa.size++;
 
-    s->name = name;
-    s->namelen = len;
+    s->name = t->lex;
+    s->namelen = t->len;
     s->is_resolved = 0;
     s->index = index;
 
     return s;
 }
 
-static struct rel *add_rel(struct parser *p, char *name, size_t namelen,
-                           size_t index, int resolved)
+static struct rel *add_rel(struct parser *p, struct sym *s, struct token *t)
 {
     struct rel *r;
+    int index = 0;
+    int resolved = 0;
+
+    if (s != NULL) {
+        resolved = 1;
+        index = s->index;
+    }
 
     memgrow((struct mem *) &p->ra);
     r = p->ra.buf + p->ra.size;
@@ -99,8 +105,8 @@ static struct rel *add_rel(struct parser *p, char *name, size_t namelen,
     r->loc = p->code.size;
     r->ref = index;
     r->is_resolved = resolved;
-    r->name = name;
-    r->namelen = namelen;
+    r->name = t->lex;
+    r->namelen = t->len;
 
     return r;
 }
@@ -111,20 +117,20 @@ static void symbol_type_declaration(struct parser *p, enum sym_type type)
         struct token *t = consume(p, TOK_SYMBOL, "symbol");
         struct sym *s;
 
-        s = find_symbol(p, t->start, t->len);
+        s = find_symbol(p, t);
         if (s != NULL) {
-            fprintf(stderr, "symbol already defined\n");
+            fprintf(stderr, "symbol %.*s already defined\n", t->len, t->lex);
             exit(1);
         }
 
-        s = add_symbol(p, t->start, t->len);
+        s = add_symbol(p, t);
         s->type = type;
 
         if (type == TYPE_EXTERN) {
             s->is_resolved = 1;
         }
 
-        if (peek(p)->kind == TOK_COMMA) {
+        if (next(p, TOK_COMMA) == 1) {
             advance(p);
         } else {
             break;
@@ -132,141 +138,120 @@ static void symbol_type_declaration(struct parser *p, enum sym_type type)
     }
 }
 
-static int number(struct token *t, size_t max_size)
+static void resolve_symbol(struct parser *p, struct token *decl)
 {
-    char valbuf[6];
-    size_t bufsize = sizeof(valbuf);
-    size_t value;
+    struct sym *s;
 
-    if (t->len > bufsize - 1) {
-        fprintf(stderr, "number is too big\n");
-        exit(1);
+    s = find_symbol(p, decl);
+    if (s == NULL) {
+        s = add_symbol(p, decl);
+        s->type = TYPE_LOCAL;
+    }
+    s->value = p->code.size;
+    s->is_resolved = 1;
+
+    for (int i = 0; i < p->ra.size; ++i) {
+        struct rel *r = p->ra.buf + i;
+
+        if (s->namelen == r->namelen &&
+                memcmp(r->name, s->name, s->namelen) == 0) {
+            r->ref = s->index;
+            r->is_resolved = 1;
+        }
+    }
+}
+
+static void emit_bytes(struct parser *p, void *buf, int size)
+{
+    int old_size = p->code.size;
+
+    p->code.size += size;
+    memgrow((struct mem *) &p->code);
+    memcpy(p->code.buf + old_size, buf, size);
+}
+
+static void opcode_statement(struct parser *p, struct token *opcode)
+{
+    int valsize = 2;
+    uint8_t op = (1 << 7) | (opcode->value & 0xff);
+    enum token_kind expected_kinds[3] = {TOK_NUM, TOK_STR, TOK_SYMBOL};
+
+    if (opcode->kind == TOK_OPCODE_BYTE) {
+        valsize = 1;
+        op = opcode->value;
     }
 
-    memset(valbuf, 0, bufsize);
-    memcpy(valbuf, t->start, t->len);
+    emit_bytes(p, &op, 1);
 
-    value = atoi(valbuf);
-    if (value > max_size) {
-        fprintf(stderr, "number is too big\n");
-        exit(1);
+    if (next_some(p, expected_kinds, 3) == 1) {
+        struct token *t = advance(p);
+
+        switch (t->kind) {
+        case TOK_NUM:
+            emit_bytes(p, &t->value, valsize);
+            break;
+
+        case TOK_STR:
+            if (t->len > 1) {
+                fprintf(stderr, "expected character but got %.*s\n",
+                                t->len, t->lex);
+                exit(1);
+            }
+            emit_bytes(p, t->lex, 1);
+            break;
+
+        case TOK_SYMBOL: {
+            // NOTE: just random value; its going to be relocated anyway
+            int value = 0;
+            struct sym *s = find_symbol(p, t);
+
+            add_rel(p, s, t);
+            emit_bytes(p, &value, 2);
+        } break;
+
+        default:
+            fprintf(stderr, "unreachable; token: %.*s\n", t->len, t->lex);
+            exit(1);
+        }
     }
-
-    return value;
 }
 
 static void symbol_declaration(struct parser *p)
 {
-    struct token *t;
-    struct sym *s;
-    size_t old_size, len, valsize;
-    char *start;
-    int value;
-    uint8_t op;
-    enum token_kind ks[3] = {TOK_NUM, TOK_STR, TOK_SYMBOL};
-    enum token_kind sks[5] = {TOK_OPCODE, TOK_OPCODE_BYTE, TOK_STR, TOK_NUM, TOK_BYTES};
+    enum token_kind expected_kinds[5] = {TOK_STR, TOK_NUM, TOK_BYTES,
+                                         TOK_OPCODE, TOK_OPCODE_BYTE};
 
-    while (next_some(p, sks, 5) == 1) {
-        t = advance(p);
+    consume(p, TOK_COLON, ":");
+
+    while (next_some(p, expected_kinds, 5) == 1) {
+        struct token *t = advance(p);
 
         switch (t->kind) {
         case TOK_OPCODE:
         case TOK_OPCODE_BYTE:
-            valsize = 2;
-            op = (1 << 7) | t->opcode;
-            if (t->kind == TOK_OPCODE_BYTE) {
-                valsize = 1;
-                op = t->opcode;
-            }
-            memgrow((struct mem *) &p->code);
-            p->code.buf[p->code.size++] = op;
-
-            if (next_some(p, ks, 3) == 1) {
-                t = advance(p);
-
-                switch (t->kind) {
-                case TOK_NUM:
-                    old_size = p->code.size;
-                    value = number(t, valsize == 2 ? USHRT_MAX : UCHAR_MAX);
-                    p->code.size += valsize;
-                    memgrow((struct mem *) &p->code);
-                    memcpy(p->code.buf + old_size, &value, valsize);
-                    break;
-
-                case TOK_STR:
-                    start = t->start + 1;
-                    len = t->len - 2;
-                    old_size = p->code.size;
-
-                    if (len != 1) {
-                        fprintf(stderr, "expected character\n");
-                        exit(1);
-                    }
-
-                    memgrow((struct mem *) &p->code);
-                    p->code.buf[p->code.size++] = *start;
-                    break;
-
-                case TOK_SYMBOL:
-                    {
-                        size_t index = 0;
-                        int resolved = 0;
-
-                        s = find_symbol(p, t->start, t->len);
-                        if (s != NULL) {
-                            resolved = 1;
-                            index = s->index;
-                        }
-                        add_rel(p, t->start, t->len, index, resolved);
-                    }
-                    old_size = p->code.size;
-                    p->code.size += 2;
-                    value = 0;
-                    memgrow((struct mem *) &p->code);
-                    memcpy(p->code.buf + old_size, &value, 2);
-                    break;
-
-                default:
-                    fprintf(stderr, "unreachable\n");
-                    exit(1);
-                }
-            }
+            opcode_statement(p, t);
             break;
 
         case TOK_STR:
-            start = t->start + 1;
-            len = t->len - 2;
-            old_size = p->code.size;
-
-            if (len == 0) {
-                fprintf(stderr, "empty string\n");
-                exit(1);
-            }
-
-            p->code.size += len;
-            memgrow((struct mem *) &p->code);
-            memcpy(p->code.buf + old_size, start, len);
+            emit_bytes(p, t->lex, t->len);
             break;
 
         case TOK_NUM:
-            old_size = p->code.size;
-            value = number(t, USHRT_MAX);
-            p->code.size += 2;
-            memgrow((struct mem *) &p->code);
-            memcpy(p->code.buf + old_size, &value, 2);
+            emit_bytes(p, &t->value, 2);
             break;
 
         case TOK_BYTES:
+            t = consume(p, TOK_NUM, "number");
+            emit_bytes(p, &t->value, 1);
+
             while (next(p, TOK_NUM) == 1) {
-                struct token *num = advance(p);
-                value = number(num, UCHAR_MAX);
-                memgrow((struct mem *) &p->code);
-                p->code.buf[p->code.size++] = value;
+                t = advance(p);
+                emit_bytes(p, &t->value, 1);
             }
             break;
 
         default:
-            fprintf(stderr, "unexpected token\n");
+            fprintf(stderr, "unreachable; token %.*s\n", t->len, t->lex);
             exit(1);
         }
     }
@@ -274,12 +259,8 @@ static void symbol_declaration(struct parser *p)
 
 void compile(struct parser *p)
 {
-    FILE *out;
-    char c;
-
     for (;;) {
         struct token *t;
-        struct sym *s;
 
         if (has_toks(p) == 0) {
             break;
@@ -297,88 +278,39 @@ void compile(struct parser *p)
             break;
 
         case TOK_SYMBOL:
-            consume(p, TOK_COLON, ":");
-
-            s = find_symbol(p, t->start, t->len);
-            if (s == NULL) {
-                s = add_symbol(p, t->start, t->len);
-                s->type = TYPE_LOCAL;
-            }
-
-            s->value = p->code.size;
-            s->is_resolved = 1;
-
-            for (size_t i = 0; i < p->ra.size; ++i) {
-                struct rel *r = p->ra.buf + i;
-
-                if (s->namelen == r->namelen &&
-                        memcmp(r->name, s->name, s->namelen) == 0) {
-                    r->ref = s->index;
-                    r->is_resolved = 1;
-                }
-            }
-
+            resolve_symbol(p, t);
             symbol_declaration(p);
             break;
 
         default:
-            fprintf(stderr, "unknown token\n");
+            fprintf(stderr, "unknown token %.*s\n", t->len, t->lex);
             exit(1);
         }
     }
 
-    for (size_t i = 0; i < p->sa.size; ++i) {
+    for (int i = 0; i < p->sa.size; ++i) {
         struct sym *s = p->sa.buf + i;
         if (s->is_resolved == 0) {
-            fprintf(stderr, "undefined symbol\n");
+            fprintf(stderr, "undefined symbol %.*s\n", s->namelen, s->name);
             exit(1);
         }
     }
 
-    for (size_t i = 0; i < p->ra.size; ++i) {
+    for (int i = 0; i < p->ra.size; ++i) {
         struct rel *r = p->ra.buf + i;
         if (r->is_resolved == 0) {
-            fprintf(stderr, "undefined symbol\n");
+            fprintf(stderr, "undefined symbol %.*s\n", r->namelen, r->name);
             exit(1);
         }
     }
+}
 
-    out = fopen("out.o", "w");
-    if (out == NULL) {
-        perror("fopen failed");
-        exit(1);
-    }
+void parser_init(struct parser *p)
+{
+    meminit((struct mem *) &p->ta, sizeof(struct token), 32); // LEAK: os free
+    meminit((struct mem *) &p->sa, sizeof(struct sym), 16); // LEAK: os free
+    meminit((struct mem *) &p->ra, sizeof(struct rel), 16); // LEAK: os free
+    meminit((struct mem *) &p->code, sizeof(uint8_t), 64); // LEAK: os free
 
-    fwrite(&p->sa.size, 2, 1, out);
-    fwrite(&p->ra.size, 2, 1, out);
-    fwrite(&p->code.size, 2, 1, out);
-
-    c = '\n';
-    fwrite(&c, 1, 1, out);
-
-    for (size_t i = 0; i < p->sa.size; ++i) {
-        struct sym *s = p->sa.buf + i;
-
-        fwrite(s->name, 1, s->namelen, out);
-        c = '\0';
-        fwrite(&c, 1, 1, out);
-
-        fwrite(&s->value, 2, 1, out);
-        fwrite(&s->type, 1, 1, out);
-    }
-
-    c = '\n';
-    fwrite(&c, 1, 1, out);
-
-    for (size_t i = 0; i < p->ra.size; ++i) {
-        struct rel *r = p->ra.buf + i;
-        fwrite(&r->loc, 2, 1, out);
-        fwrite(&r->ref, 2, 1, out);
-    }
-
-    c = '\n';
-    fwrite(&c, 1, 1, out);
-
-    fwrite(p->code.buf, 1, p->code.size, out);
-    fclose(out);
+    p->cur = p->ta.buf;
 }

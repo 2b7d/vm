@@ -1,6 +1,3 @@
-// #include <stddef.h>
-// #include <stdint.h>
-
 enum token_kind {
     TOK_BYTES,
     TOK_EXTERN,
@@ -19,9 +16,16 @@ enum token_kind {
 
 struct token {
     enum token_kind kind;
-    char *start;
-    size_t len;
-    int opcode;
+    char *lex;
+    int len;
+    int value;
+};
+
+struct token_array {
+    int size;
+    int cap;
+    int data_size;
+    struct token *buf;
 };
 
 struct scanner {
@@ -31,4 +35,4 @@ struct scanner {
 };
 
 void scanner_init(struct scanner *s, char *src);
-void scan_token(struct scanner *s, struct token *t);
+void scan_tokens(struct scanner *s, struct token_array *ta);

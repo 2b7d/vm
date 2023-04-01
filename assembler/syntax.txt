@@ -1,11 +1,9 @@
 program -> symbol_declaration*
-           global_declaration*
-           extern_declaration*
+           symbol_type_declaration*
            EOF
 
-global_declaration -> ".global" symbol ("," symbol)*
-extern_declaration -> ".extern" symbol ("," symbol)*
 symbol_declaration -> symbol ":" (opcode_statement | string | number | bytes_expression)*
+symbol_type_declaration -> (".extern" | ".global") symbol ("," symbol)*
 
 opcode_statement -> opcode (number | character | symbol)?
 

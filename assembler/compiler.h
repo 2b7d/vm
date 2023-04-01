@@ -1,53 +1,57 @@
+// #include <stdint.h>
+// #include "scanner.h"
+
 enum sym_type { TYPE_LOCAL, TYPE_GLOBAL, TYPE_EXTERN };
 
-struct token_array {
-    size_t size;
-    size_t cap;
-    size_t data_size;
-    struct token *buf;
-};
-
 struct sym {
-    char *name;
-    size_t namelen;
-    unsigned short value;
-    int is_resolved;
     enum sym_type type;
-    unsigned long index;
+
+    char *name;
+    int namelen;
+
+    int value;
+    int index;
+
+    int is_resolved;
 };
 
 struct sym_array {
-    size_t size;
-    size_t cap;
-    size_t data_size;
+    int size;
+    int cap;
+    int data_size;
     struct sym *buf;
 };
 
 struct rel {
-    unsigned short loc;
-    unsigned short ref;
-    int is_resolved;
     char *name;
-    size_t namelen;
+    int namelen;
+
+    int loc;
+    int ref;
+
+    int is_resolved;
 };
 
 struct rel_array {
-    size_t size;
-    size_t cap;
-    size_t data_size;
+    int size;
+    int cap;
+    int data_size;
     struct rel *buf;
 };
 
 struct parser {
     struct token *cur;
+    struct token_array ta;
+
     struct sym_array sa;
     struct rel_array ra;
-    struct token_array toks;
     struct {
-        size_t size;
-        size_t cap;
+        int size;
+        int cap;
+        int data_size;
         uint8_t *buf;
     } code;
 };
 
+void parser_init(struct parser *p);
 void compile(struct parser *p);

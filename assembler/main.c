@@ -6,11 +6,13 @@
 #include "../util.h" // TODO: make path absolute
 
 #include "mem.h" // lib
-                 //
+
 int main(int argc, char **argv)
 {
     struct scanner s;
     struct parser p;
+    char *src, *outpath, c;
+    FILE *out;
 
     argc--;
     argv++;
@@ -20,28 +22,53 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    scanner_init(&s, read_file(*argv)); // LEAK: os is freeing
-    meminit((struct mem *) &p.toks, sizeof(struct token), 32); // LEAK: os is freeing
-    meminit((struct mem *) &p.sa, sizeof(struct sym), 16); // LEAK: os is freeing
-    meminit((struct mem *) &p.ra, sizeof(struct rel), 16); // LEAK: os is freeing
-    meminit((struct mem *) &p.code, sizeof(uint8_t), 16); // LEAK: os is freeing
+    src = read_file(*argv); // LEAK: os is freeing
 
-    for (;;) {
-        struct token *t;
+    scanner_init(&s, src);
+    parser_init(&p);
 
-        memgrow((struct mem *) &p.toks);
-        t = p.toks.buf + p.toks.size;
-        p.toks.size++;
+    scan_tokens(&s, &p.ta);
+    compile(&p);
 
-        scan_token(&s, t);
-        if (t->kind == TOK_EOF) {
-            break;
-        }
+    outpath = create_outpath(*argv, "o"); // LEAK os is freeing
+    out = fopen(outpath, "w");
+    if (out == NULL) {
+        perror("fopen failed");
+        return 1;
     }
 
-    p.cur = p.toks.buf;
+    fwrite(&p.sa.size, 2, 1, out);
+    fwrite(&p.ra.size, 2, 1, out);
+    fwrite(&p.code.size, 2, 1, out);
 
-    compile(&p);
+    c = '\n';
+    fwrite(&c, 1, 1, out);
+
+    for (int i = 0; i < p.sa.size; ++i) {
+        struct sym *s = p.sa.buf + i;
+
+        fwrite(s->name, 1, s->namelen, out);
+        c = '\0';
+        fwrite(&c, 1, 1, out);
+
+        fwrite(&s->value, 2, 1, out);
+        fwrite(&s->type, 1, 1, out);
+    }
+
+    c = '\n';
+    fwrite(&c, 1, 1, out);
+
+    for (int i = 0; i < p.ra.size; ++i) {
+        struct rel *r = p.ra.buf + i;
+        fwrite(&r->loc, 2, 1, out);
+        fwrite(&r->ref, 2, 1, out);
+    }
+
+    c = '\n';
+    fwrite(&c, 1, 1, out);
+
+    fwrite(p.code.buf, 1, p.code.size, out);
+    fclose(out);
 
     return 0;
 }

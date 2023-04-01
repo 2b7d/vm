@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+#include <limits.h>
+#include <assert.h>
 
 #include "scanner.h"
+#include "mem.h" // lib
 #include "../vm.h" // TODO: make path absolute
 
 static char *opcodes_str[OP_COUNT] = {
@@ -45,10 +47,10 @@ static char *opcodes_str[OP_COUNT] = {
 
 static int check_opcode(struct token *t)
 {
-    unsigned long len = t->len;
     int is_byte = 0;
+    int len = t->len;
 
-    if (t->start[len - 1] == '8') {
+    if (t->lex[len - 1] == '8') {
         len--;
         is_byte = 1;
     }
@@ -56,13 +58,12 @@ static int check_opcode(struct token *t)
     for (int i = 0; i < OP_COUNT; ++i) {
         char *op = opcodes_str[i];
 
-        if (len == strlen(op) && memcmp(op, t->start, len) == 0) {
+        if ((size_t) len == strlen(op) && memcmp(op, t->lex, len) == 0) {
+            t->kind = TOK_OPCODE;
             if (is_byte) {
                 t->kind = TOK_OPCODE_BYTE;
-            } else {
-                t->kind = TOK_OPCODE;
             }
-            t->opcode = i;
+            t->value = i;
             return 1;
         }
     }
@@ -131,7 +132,7 @@ static void skip_comment(struct scanner *s)
 static void make_token(struct scanner *s, struct token *t, enum token_kind k)
 {
     t->kind = k;
-    t->start = s->start;
+    t->lex = s->start;
     t->len = s->cur - s->start;
 }
 
@@ -145,6 +146,17 @@ static void scan_string(struct scanner *s, struct token *t)
     }
 
     make_token(s, t, TOK_STR);
+
+    t->lex++;
+    t->len -= 2;
+
+    assert(t->len >= 0);
+
+    if (t->len == 0) {
+        // should it be though?
+        fprintf(stderr, "empty strings are not allowed\n");
+        exit(1);
+    }
 }
 
 static void scan_directive(struct scanner *s, struct token *t)
@@ -155,25 +167,42 @@ static void scan_directive(struct scanner *s, struct token *t)
 
     make_token(s, t, TOK_EOF);
 
-    if (t->len == 6 && memcmp(".bytes", t->start, t->len) == 0) {
+    if (t->len == 6 && memcmp(".bytes", t->lex, t->len) == 0) {
         t->kind = TOK_BYTES;
-    } else if (t->len == 7 && memcmp(".global", t->start, t->len) == 0) {
+    } else if (t->len == 7 && memcmp(".global", t->lex, t->len) == 0) {
         t->kind = TOK_GLOBAL;
-    } else if (t->len == 7 && memcmp(".extern", t->start, t->len) == 0) {
+    } else if (t->len == 7 && memcmp(".extern", t->lex, t->len) == 0) {
         t->kind = TOK_EXTERN;
     } else {
-        fprintf(stderr, "unknown directive\n");
+        fprintf(stderr, "unknown directive %.*s\n", t->len, t->lex);
         exit(1);
     }
 }
 
 static void scan_number(struct scanner *s, struct token *t)
 {
+    char valbuf[6];
+    int bufsize = sizeof(valbuf);
+
     while (is_digit(peek(s)) == 1) {
         advance(s);
     }
 
     make_token(s, t, TOK_NUM);
+
+    if (t->len > bufsize - 1) {
+        fprintf(stderr, "number %.*s is too big\n", t->len, t->lex);
+        exit(1);
+    }
+
+    memset(valbuf, 0, bufsize);
+    memcpy(valbuf, t->lex, t->len);
+
+    t->value = atoi(valbuf);
+    if (t->value > USHRT_MAX) {
+        fprintf(stderr, "number %.*s is too big\n", t->len, t->lex);
+        exit(1);
+    }
 }
 
 static void scan_identifier(struct scanner *s, struct token *t)
@@ -183,13 +212,10 @@ static void scan_identifier(struct scanner *s, struct token *t)
     }
 
     make_token(s, t, TOK_SYMBOL);
-
-    if (check_opcode(t) == 1) {
-        return;
-    }
+    check_opcode(t);
 }
 
-void scan_token(struct scanner *s, struct token *t)
+static void scan_token(struct scanner *s, struct token *t)
 {
     char c;
 
@@ -240,6 +266,22 @@ scan_again:
 
         fprintf(stderr, "unknown character %c\n", c);
         exit(1);
+    }
+}
+
+void scan_tokens(struct scanner *s, struct token_array *ta)
+{
+    for (;;) {
+        struct token *t;
+
+        memgrow((struct mem *) ta);
+        t = ta->buf + ta->size;
+        ta->size++;
+
+        scan_token(s, t);
+        if (t->kind == TOK_EOF) {
+            break;
+        }
     }
 }
 
