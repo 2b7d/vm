@@ -2,7 +2,7 @@ Object file format:
     header \n
     symbols \n
     relocations \n
-    data
+    code
 
 each section is a continuous sequence of bytes separated by \n
 
@@ -10,14 +10,14 @@ header:
     nsyms nrels ndata
         nsyms - 2 bytes number of symbols
         nrels - 2 bytes number of relocations
-        ndata - 2 bytes size of data
+        ncode - 2 bytes size of code
 
     if section is empty then value is 0
 
 symbols:
     name value type
         name  - null-terminated name of symbol
-        value - 2 bytes         symbol file-relative address
+        value - 2 bytes         code-relative symbol address
         type  - 1 byte          0 - local
                                 1 - global
                                 2 - extern
@@ -26,8 +26,8 @@ symbols:
 
 relocations:
     loc ref
-        loc - 2 bytes data location to be relocated
+        loc - 2 bytes code location to be relocated
         ref - 2 bytes symbol number
 
-data:
+code:
     compiled bytecode

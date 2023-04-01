@@ -72,12 +72,8 @@ static struct sym *find_symbol(struct parser *p, struct token *t)
 
 static struct sym *add_symbol(struct parser *p, struct token *t)
 {
-    struct sym *s;
     int index = p->sa.size;
-
-    memgrow((struct mem *) &p->sa);
-    s = p->sa.buf + p->sa.size;
-    p->sa.size++;
+    struct sym *s = memnext((struct mem *) &p->sa);
 
     s->name = t->lex;
     s->namelen = t->len;
@@ -89,7 +85,7 @@ static struct sym *add_symbol(struct parser *p, struct token *t)
 
 static struct rel *add_rel(struct parser *p, struct sym *s, struct token *t)
 {
-    struct rel *r;
+    struct rel *r = memnext((struct mem *) &p->ra);
     int index = 0;
     int resolved = 0;
 
@@ -97,10 +93,6 @@ static struct rel *add_rel(struct parser *p, struct sym *s, struct token *t)
         resolved = 1;
         index = s->index;
     }
-
-    memgrow((struct mem *) &p->ra);
-    r = p->ra.buf + p->ra.size;
-    p->ra.size++;
 
     r->loc = p->code.size;
     r->ref = index;

@@ -45,11 +45,7 @@ void scan(struct scanner *s, struct directive_array *dirs)
         }
 
         if (s->cur - start - 1 == 6 && memcmp(start + 1, "define", 6) == 0) {
-            struct directive *d;
-
-            memgrow((struct mem *) dirs);
-            d = dirs->buf + dirs->size;
-            dirs->size++;
+            struct directive *d = memnext((struct mem *) dirs);
 
             d->start = start;
 

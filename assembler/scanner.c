@@ -272,11 +272,7 @@ scan_again:
 void scan_tokens(struct scanner *s, struct token_array *ta)
 {
     for (;;) {
-        struct token *t;
-
-        memgrow((struct mem *) ta);
-        t = ta->buf + ta->size;
-        ta->size++;
+        struct token *t = memnext((struct mem *) ta);
 
         scan_token(s, t);
         if (t->kind == TOK_EOF) {
