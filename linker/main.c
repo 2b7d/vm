@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <assert.h>
+
+#include "../util.h"
 
 #include "mem.h" // lib
 
@@ -120,36 +119,6 @@ static int gsymbol_get_addr(char *name)
     s = m->sa.buf + gs->symnum;
 
     return s->value + m->start;
-}
-
-static void module_init(struct module *m, char *pathname)
-{
-    int fd;
-    struct stat statbuf;
-
-    fd = open(pathname, O_RDONLY);
-    if (fd < 0) {
-        perror("failed to open file");
-        exit(1);
-    }
-
-    if (fstat(fd, &statbuf) < 0) {
-        perror("failed to get file info");
-        exit(1);
-    }
-
-    m->src = malloc(statbuf.st_size);
-    if (m->src == NULL) {
-        perror("malloc failed");
-        exit(1);
-    }
-
-    if (read(fd, m->src, statbuf.st_size) < 0) {
-        perror("read failed");
-        exit(1);
-    }
-
-    close(fd);
 }
 
 static void read_separator(struct module *m)
@@ -293,12 +262,12 @@ int main(int argc, char **argv)
     for (int i = 0; *argv != NULL; ++i) {
         struct module *m = memnext((struct mem *) &modules);
 
-        module_init(m, *argv);
-        meminit((struct mem *) &m->sa, sizeof(struct sym), 16);
-        meminit((struct mem *) &m->ra, sizeof(struct rel), 16);
-
+        m->src = read_file(*argv);
         m->start = start;
         m->index = i;
+
+        meminit((struct mem *) &m->sa, sizeof(struct sym), 16);
+        meminit((struct mem *) &m->ra, sizeof(struct rel), 16);
 
         read_header(m);
 

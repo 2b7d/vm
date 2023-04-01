@@ -35,13 +35,13 @@ void scan(struct scanner *s, struct directive_array *dirs)
         char *start = s->cur;
 
         if (*s->cur != '#') {
-            s->cur++;
+            ++s->cur;
             continue;
         }
 
-        s->cur++;
+        ++s->cur;
         while (isalpha(*s->cur) != 0) {
-            s->cur++;
+            ++s->cur;
         }
 
         if (s->cur - start - 1 == 6 && memcmp(start + 1, "define", 6) == 0) {
@@ -49,25 +49,25 @@ void scan(struct scanner *s, struct directive_array *dirs)
 
             d->start = start;
 
-            s->cur++;
+            ++s->cur;
             start = s->cur;
             while (isspace(*s->cur) == 0 && *s->cur != '\0') {
-                s->cur++;
+                ++s->cur;
             }
 
             d->name = start;
             d->namelen = s->cur - start;
 
-            s->cur++;
+            ++s->cur;
             start = s->cur;
             while (isspace(*s->cur) == 0 && *s->cur != '\0') {
-                s->cur++;
+                ++s->cur;
             }
 
             d->value = start;
             d->valuelen = s->cur - start;
             d->len = s->cur - d->start;
-            s->cur++;
+            ++s->cur;
             continue;
         }
 
@@ -122,7 +122,7 @@ void process_directives(char *pathname, struct scanner *s,
                 char *start = s->cur, *ch = s->cur;
 
                 while (isspace(*ch) == 0 && *ch != '\0') {
-                    ch++;
+                    ++ch;
                 }
 
                 if (ch - start == d->namelen &&
@@ -135,7 +135,7 @@ void process_directives(char *pathname, struct scanner *s,
         }
 
         fwrite(s->cur, 1, 1, f);
-        s->cur++;
+        ++s->cur;
     }
 
     fclose(f);
@@ -147,8 +147,8 @@ int main(int argc, char **argv)
     struct directive_array dirs;
     char *outpath;
 
-    argc--;
-    argv++;
+    --argc;
+    ++argv;
 
     if (argc < 1) {
         printf("assembly file is required\n");

@@ -51,7 +51,7 @@ static int check_opcode(struct token *t)
     int len = t->len;
 
     if (t->lex[len - 1] == '8') {
-        len--;
+        --len;
         is_byte = 1;
     }
 
@@ -111,7 +111,7 @@ static char advance(struct scanner *s)
     char c = peek(s);
 
     if (has_src(s) == 1) {
-        s->cur++;
+        ++s->cur;
     }
 
     return c;
@@ -147,7 +147,7 @@ static void scan_string(struct scanner *s, struct token *t)
 
     make_token(s, t, TOK_STR);
 
-    t->lex++;
+    ++t->lex;
     t->len -= 2;
 
     assert(t->len >= 0);

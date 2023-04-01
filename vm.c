@@ -35,8 +35,8 @@ void ramstore(uint16_t addr, uint16_t val)
     lsb = val;
     msb = val >> 8;
 
-    ram[addr] = lsb;
-    ram[addr + 1] = msb;
+    ramstore8(addr, lsb);
+    ramstore8(addr + 1, msb);
 }
 
 uint16_t ramload(uint16_t addr)
@@ -46,12 +46,13 @@ uint16_t ramload(uint16_t addr)
     lsb = ramload8(addr);
     msb = ramload8(addr + 1);
 
-    return msb << 8 | lsb;
+    return (msb << 8) | lsb;
 }
 
 void push8(uint8_t val)
 {
-    stack[sp++] = val;
+    stack[sp] = val;
+    ++sp;
 }
 
 uint8_t pop8()
@@ -77,12 +78,13 @@ uint16_t pop()
     msb = pop8();
     lsb = pop8();
 
-    return msb << 8 | lsb;
+    return (msb << 8) | lsb;
 }
 
 void rspush8(uint8_t val)
 {
-    ramstore8(rsp--, val);
+    ramstore8(rsp, val);
+    --rsp;
 }
 
 uint8_t rspop8()
@@ -108,13 +110,13 @@ uint16_t rspop()
     lsb = rspop8();
     msb = rspop8();
 
-    return msb << 8 | lsb;
+    return (msb << 8) | lsb;
 }
 
 void load_program(char *pathname)
 {
+    int i;
     FILE *f;
-    size_t i = 0;
 
     f = fopen(pathname, "r");
     if (f == NULL) {
@@ -122,16 +124,17 @@ void load_program(char *pathname)
         exit(1);
     }
 
-    fread(&pc, sizeof(uint16_t), 1, f);
+    fread(&pc, 2, 1, f);
 
+    i = 0;
     for (;;) {
         if (i >= RAM_CAP) {
             puts("ERROR: not enough memory to load program");
             exit(1);
         }
 
-        fread(ram + i, sizeof(uint8_t), 1, f);
-        i++;
+        fread(ram + i, 1, 1, f);
+        ++i;
 
         if (ferror(f) != 0) {
             puts("ERROR: failed to read binary file");
@@ -151,8 +154,8 @@ int main(int argc, char **argv)
 {
     int halt = 0;
 
-    argc--;
-    argv++;
+    --argc;
+    ++argv;
 
     if (argc < 1) {
         puts("binary file is required");
@@ -169,9 +172,10 @@ int main(int argc, char **argv)
         uint16_t a, b;
         uint8_t a8, b8, inst, opcode, mode;
 
-        inst = ramload8(pc++);
+        inst = ramload8(pc);
+        ++pc;
         opcode = inst & 0x7f;
-        mode = inst >> 7 & 0x1;
+        mode = (inst >> 7) & 0x1;
 
         switch (opcode) {
         case OP_ST:
@@ -262,7 +266,8 @@ int main(int argc, char **argv)
                 push(ramload(pc));
                 pc += 2;
             } else {
-                push8(ramload8(pc++));
+                push8(ramload8(pc));
+                ++pc;
             }
             break;
 
@@ -437,7 +442,7 @@ int main(int argc, char **argv)
             case SYS_WRITE:
                 a = pop();
                 b = pop();
-                for (size_t i = 0; i < a; ++i) {
+                for (int i = 0; i < a; ++i) {
                     fputc(ramload8(b + i), stdout);
                 }
                 break;

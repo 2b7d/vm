@@ -17,15 +17,15 @@ fi
 
 if [ "$name" = "linker" ]; then
     name="ld"
-    files="./linker/*.c"
+    files="./linker/*.c util.c"
     incl="-I/home/fosseddy/programming/c-sandbox/include"
     libs="-L/home/fosseddy/programming/c-sandbox/lib -lmem"
 fi
 
 if [ "$name" = "preproc" ]; then
+    files="$name.c util.c"
     incl="-I/home/fosseddy/programming/c-sandbox/include"
     libs="-L/home/fosseddy/programming/c-sandbox/lib -lmem"
-    files="$name.c util.c"
 fi
 
 if [ "$name" = "vm" ]; then

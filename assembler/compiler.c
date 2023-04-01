@@ -32,7 +32,7 @@ static struct token *advance(struct parser *p)
     struct token *t = peek(p);
 
     if (has_toks(p) == 1) {
-        p->cur++;
+        ++p->cur;
     }
 
     return t;
@@ -47,7 +47,6 @@ static int next2(struct parser *p, enum token_kind k)
 {
     return peek2(p)->kind == k;
 }
-
 
 static int next_some(struct parser *p, enum token_kind *ks, size_t ksize)
 {

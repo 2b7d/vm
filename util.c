@@ -43,8 +43,10 @@ char *read_file(char *pathname)
 
 char *create_outpath(char *inpath, char *ext)
 {
+    int extlen = 0;
+
     char *path, *start, *end, *ch;
-    size_t len, extlen = 0;
+    int len;
 
     start = inpath;
     end = start + strlen(inpath);
@@ -72,7 +74,8 @@ char *create_outpath(char *inpath, char *ext)
 
     memcpy(path, start, len);
     if (ext != NULL) {
-        path[len++] = '.';
+        path[len] = '.';
+        ++len;
         memcpy(path + len, ext, extlen);
     }
 
