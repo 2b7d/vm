@@ -55,3 +55,4 @@ struct parser {
 
 void parser_init(struct parser *p);
 void compile(struct parser *p);
+void write_object_file(struct parser *p, char *outpath);

@@ -2,7 +2,10 @@
 #define NULL 0
 #define SYS_write 1
 
-message: "hello, world" LF NULL
+.global _start
+.extern strlen
+
+message: "hello, world" .bytes LF NULL
 
 _start:
     push message
@@ -11,16 +14,3 @@ _start:
 
     halt
 
-; ptrb -> ptrb n1
-strlen:
-    push 0
-strlen_loop:
-    over over add ld8
-
-    push8 0 eq8
-    jmpif strlen_done
-
-    inc
-    jmp strlen_loop
-strlen_done:
-ret

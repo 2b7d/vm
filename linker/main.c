@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "mem.h" // lib
 
@@ -43,7 +44,6 @@ struct module {
     char *code;
 
     char *src;
-    char *cur;
 
     int start;
     int index;
@@ -106,6 +106,22 @@ static struct gsym *gsymbol_get(char *name)
     return NULL;
 }
 
+static int gsymbol_get_addr(char *name)
+{
+    struct module *m;
+    struct gsym *gs = gsymbol_get(name);
+    struct sym *s;
+
+    if (gs == NULL) {
+        return -1;
+    }
+
+    m = modules.buf + gs->module;
+    s = m->sa.buf + gs->symnum;
+
+    return s->value + m->start;
+}
+
 static void module_init(struct module *m, char *pathname)
 {
     int fd;
@@ -134,22 +150,22 @@ static void module_init(struct module *m, char *pathname)
     }
 
     close(fd);
-
-    m->cur = m->src;
 }
 
 static void read_separator(struct module *m)
 {
-    if (*m->cur++ != '\n') {
-        fprintf(stderr, "expected separator\n");
+    if (*m->src != '\n') {
+        fprintf(stderr, "expected separator but got %c\n", *m->src);
         exit(1);
     }
+
+    ++m->src;
 }
 
 static void read_bytes(struct module *m, void *dest, int size)
 {
-    memcpy(dest, m->cur, size);
-    m->cur += size;
+    memcpy(dest, m->src, size);
+    m->src += size;
 }
 
 static void read_header(struct module *m)
@@ -171,8 +187,8 @@ static void read_symbols(struct module *m)
         struct sym *s = memnext((struct mem *) &m->sa);
 
         s->number = i;
-        s->name = m->cur;
-        m->cur += strlen(m->cur) + 1;
+        s->name = m->src;
+        m->src += strlen(m->src) + 1;
 
         read_bytes(m, &s->value, 2);
         read_bytes(m, &s->type, 1);
@@ -201,63 +217,66 @@ static void read_relocations(struct module *m)
     read_separator(m);
 }
 
-static void read_data(struct module *m)
-{
-    if (m->h.ncode == 0) {
-        m->code = NULL;
-        return;
-    }
-
-    m->code = malloc(m->h.ncode);
-    if (m->code == NULL) {
-        perror("malloc failed");
-        exit(1);
-    }
-
-    read_bytes(m, m->code, m->h.ncode);
-}
-
 static void relocate_symbols(struct module *m)
 {
     for (int i = 0; i < m->ra.size; ++i) {
         struct rel *r = m->ra.buf + i;
         struct sym *s;
-        struct gsym *gs;
-        int value;
+        int addr;
+
+        assert(r->ref >= 0);
 
         if (r->ref >= m->sa.size) {
-            fprintf(stderr, "invalid relocation reference\n");
+            fprintf(stderr, "invalid relocation reference {loc: %d ref: %d}\n",
+                            r->loc, r->ref);
             exit(1);
         }
 
         s = m->sa.buf + r->ref;
-        if (s->type == TYPE_EXTERN) {
-            struct module *sm;
+        addr = s->value + m->start;
 
-            gs = gsymbol_get(s->name);
-            if (gs == NULL) {
+        if (s->type == TYPE_EXTERN) {
+            addr = gsymbol_get_addr(s->name);
+            if (addr < 0) {
                 fprintf(stderr, "symbol %s is not defined\n", s->name);
                 exit(1);
             }
-
-            sm = modules.buf + gs->module;
-            s = sm->sa.buf + gs->symnum;
-            value = s->value + sm->start;
-        } else {
-            value = s->value + m->start;
         }
 
-        memcpy(m->code + r->loc, &value, 2);
+        memcpy(m->code + r->loc, &addr, 2);
     }
+}
+
+static void write_vm_executable()
+{
+    FILE *out;
+    int entry_addr = gsymbol_get_addr("_start");
+
+    if (entry_addr < 0) {
+        fprintf(stderr, "_start entry point is not defined\n");
+        exit(1);
+    }
+
+    out = fopen("a.out", "w");
+    if (out == NULL) {
+        perror("fopen failed");
+        exit(1);
+    }
+
+    fwrite(&entry_addr, 2, 1, out);
+
+    for (int i = 0; i < modules.size; ++i) {
+        struct module *m = modules.buf + i;
+
+        fwrite(m->code, 1, m->h.ncode, out);
+    }
+
+    fclose(out);
 }
 
 int main(int argc, char **argv)
 {
-    FILE *out;
-    struct gsym *gs;
-    struct sym *s;
-    struct module *m;
-    int start, value;
+    int start;
 
     --argc;
     ++argv;
@@ -267,24 +286,35 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    meminit((struct mem *) &modules, sizeof(struct module), 0); // LEAK: os is freeing
-    meminit((struct mem *) &gsymbols, sizeof(struct gsym), 16); // LEAK: os is freeing
+    meminit((struct mem *) &modules, sizeof(struct module), 0);
+    meminit((struct mem *) &gsymbols, sizeof(struct gsym), 16);
 
     start = 0;
     for (int i = 0; *argv != NULL; ++i) {
         struct module *m = memnext((struct mem *) &modules);
 
-        module_init(m, *argv); // LEAK: os is freeing
-        meminit((struct mem *) &m->sa, sizeof(struct sym), 16); // LEAK: os is freeing
-        meminit((struct mem *) &m->ra, sizeof(struct sym), 16); // LEAK: os is freeing
+        module_init(m, *argv);
+        meminit((struct mem *) &m->sa, sizeof(struct sym), 16);
+        meminit((struct mem *) &m->ra, sizeof(struct rel), 16);
 
         m->start = start;
         m->index = i;
 
         read_header(m);
+
+        if (m->h.ncode == 0) {
+            fprintf(stdout, "%s is empty; skipping\n", *argv);
+            --i;
+            --modules.size;
+            free(m->src);
+            memfree((struct mem *) &m->sa);
+            memfree((struct mem *) &m->ra);
+            continue;
+        }
+
         read_symbols(m);
         read_relocations(m);
-        read_data(m);
+        m->code = m->src;
 
         start += m->h.ncode;
         ++argv;
@@ -294,29 +324,7 @@ int main(int argc, char **argv)
         relocate_symbols(modules.buf + i);
     }
 
-    gs = gsymbol_get("_start");
-    if (gs == NULL) {
-        fprintf(stderr, "_start entry point is not defined\n");
-        exit(1);
-    }
-    m = modules.buf + gs->module;
-    s = m->sa.buf + gs->symnum;
-
-    out = fopen("a.out", "w");
-    if (out == NULL) {
-        perror("fopen failed");
-        exit(1);
-    }
-
-    value = s->value + m->start;
-    fwrite(&value, sizeof(value), 1, out);
-
-    for (int i = 0; i < modules.size; ++i) {
-        m = modules.buf + i;
-        fwrite(m->code, 1, m->h.ncode, out);
-    }
-
-    fclose(out);
+    write_vm_executable();
 
     return 0;
 }

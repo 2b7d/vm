@@ -297,12 +297,54 @@ void compile(struct parser *p)
     }
 }
 
+void write_object_file(struct parser *p, char *outpath)
+{
+    char separator = '\n';
+    char null_term = '\0';
+    FILE *out = fopen(outpath, "w");
+
+    if (out == NULL) {
+        perror("fopen failed");
+        exit(1);
+    }
+
+    fwrite(&p->sa.size, 2, 1, out);
+    fwrite(&p->ra.size, 2, 1, out);
+    fwrite(&p->code.size, 2, 1, out);
+
+    fwrite(&separator, 1, 1, out);
+
+    for (int i = 0; i < p->sa.size; ++i) {
+        struct sym *s = p->sa.buf + i;
+
+        fwrite(s->name, 1, s->namelen, out);
+        fwrite(&null_term, 1, 1, out);
+
+        fwrite(&s->value, 2, 1, out);
+        fwrite(&s->type, 1, 1, out);
+    }
+
+    fwrite(&separator, 1, 1, out);
+
+    for (int i = 0; i < p->ra.size; ++i) {
+        struct rel *r = p->ra.buf + i;
+
+        fwrite(&r->loc, 2, 1, out);
+        fwrite(&r->ref, 2, 1, out);
+    }
+
+    fwrite(&separator, 1, 1, out);
+
+    fwrite(p->code.buf, 1, p->code.size, out);
+    fclose(out);
+}
+
 void parser_init(struct parser *p)
 {
-    meminit((struct mem *) &p->ta, sizeof(struct token), 32); // LEAK: os free
-    meminit((struct mem *) &p->sa, sizeof(struct sym), 16); // LEAK: os free
-    meminit((struct mem *) &p->ra, sizeof(struct rel), 16); // LEAK: os free
-    meminit((struct mem *) &p->code, sizeof(uint8_t), 64); // LEAK: os free
+    meminit((struct mem *) &p->ta, sizeof(struct token), 32);
+    meminit((struct mem *) &p->sa, sizeof(struct sym), 16);
+    meminit((struct mem *) &p->ra, sizeof(struct rel), 16);
+    meminit((struct mem *) &p->code, sizeof(uint8_t), 64);
 
     p->cur = p->ta.buf;
 }

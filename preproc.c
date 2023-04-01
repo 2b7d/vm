@@ -155,11 +155,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    outpath = create_outpath(*argv, "i"); // LEAK: os is freeing
-    s.src = read_file(*argv); // LEAK: os is freeing
+    outpath = create_outpath(*argv, "i");
+    s.src = read_file(*argv);
     s.cur = s.src;
 
-    meminit((struct mem *) &dirs, sizeof(struct directive), 0); // LEAK: os is freeing
+    meminit((struct mem *) &dirs, sizeof(struct directive), 0);
 
     scan(&s, &dirs);
     s.cur = s.src;
