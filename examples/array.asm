@@ -1,7 +1,8 @@
 array: 3 5 2 1 4 6
-array_len: 6
+array_len: 12
 sum: 0
 
+.global _start
 _start:
     push 0
 loop:
@@ -14,7 +15,7 @@ loop:
     add
     push sum st
 
-    inc
+    push 2 add
     dup
     push array_len ld
     lt

@@ -2,6 +2,9 @@
 #define NULL 0
 #define LF 10
 
+.extern strlen
+.global _start
+
 _start:
     push LF rspush        ; +8 LF
     rsp push 7 sub rspset ; +1 buf[7]
@@ -63,17 +66,4 @@ itoa_copyto_buf:
     push NULL swap st
 
     rsdrop rsdrop rspop
-ret
-
-; ptr -> ptr n1
-strlen:
-    push 0
-strlen_loop:
-    over over add ld
-    push NULL eq
-    jmpif strlen_done
-
-    inc
-    jmp strlen_loop
-strlen_done:
 ret

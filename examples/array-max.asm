@@ -1,12 +1,13 @@
 arr: 6 8 1 69 4
-arr_len: 5
+arr_len: 10
 max: 0
 
+.global _start
 _start:
     push arr ld
     push max st
 
-    push 1
+    push 2
 loop:
     dup
     push arr
@@ -22,7 +23,7 @@ loop:
     drop
 
 inc_counter:
-    inc
+    push 2 add
     dup
     push arr_len ld
     lt
