@@ -1,7 +1,6 @@
-vm
-asm
 preproc
+asm
 ld
+vm
 a.out
-*.o
 *.i
