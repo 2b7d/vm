@@ -32,6 +32,9 @@ enum vm_opcode {
     OP_AND,      // a b -> c
     OP_NOT,      // a -> b
 
+    OP_WTB,      // a -> a8
+    OP_BTW,      // a8 -> a
+
     OP_JMP,      // ->
     OP_JMPIF,    // a ->
 
@@ -46,5 +49,5 @@ enum vm_opcode {
 
 enum vm_syscall {
     SYS_READ,
-    SYS_WRITE   // ptr len ->
+    SYS_WRITE   // ptr8 len ->
 };

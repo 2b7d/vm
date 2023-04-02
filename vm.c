@@ -419,6 +419,18 @@ int main(int argc, char **argv)
             push8(!pop8());
             break;
 
+        case OP_WTB:
+            a = pop();
+            a8 = a;
+            push8(a8);
+            break;
+
+        case OP_BTW:
+            a8 = pop8();
+            a = a8;
+            push(a);
+            break;
+
         case OP_JMP:
             pc = ramload(pc);
             break;
