@@ -7,7 +7,7 @@ Object file format:
 each section is a continuous sequence of bytes separated by \n
 
 header:
-    nsyms nrels ndata
+    nsyms nrels ncode
         nsyms - 2 bytes number of symbols
         nrels - 2 bytes number of relocations
         ncode - 2 bytes size of code
