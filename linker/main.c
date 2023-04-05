@@ -259,7 +259,7 @@ int main(int argc, char **argv)
     meminit((struct mem *) &gsymbols, sizeof(struct gsym), 16);
 
     start = 0;
-    for (int i = 0; *argv != NULL; ++i) {
+    for (int i = 0; *argv != NULL; ++i, ++argv) {
         struct module *m = memnext((struct mem *) &modules);
 
         m->src = read_file(*argv);
@@ -286,7 +286,6 @@ int main(int argc, char **argv)
         m->code = m->src;
 
         start += m->h.ncode;
-        ++argv;
     }
 
     for (int i = 0; i < modules.size; ++i) {
