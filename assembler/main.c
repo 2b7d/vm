@@ -5,8 +5,6 @@
 #include "compiler.h"
 #include "../util.h" // TODO: make path absolute
 
-#include "mem.h" // lib
-
 int main(int argc, char **argv)
 {
     struct scanner s;

@@ -4,7 +4,7 @@
 #include <ctype.h>
 
 #include "util.h"
-#include "mem.h" // lib
+#include "artmem.h" // lib
 
 struct directive {
     char *start;
@@ -45,7 +45,7 @@ void scan(struct scanner *s, struct directive_array *dirs)
         }
 
         if (s->cur - start - 1 == 6 && memcmp(start + 1, "define", 6) == 0) {
-            struct directive *d = memnext((struct mem *) dirs);
+            struct directive *d = memnext((mem_t *) dirs);
 
             d->start = start;
 
@@ -159,7 +159,7 @@ int main(int argc, char **argv)
     s.src = read_file(*argv);
     s.cur = s.src;
 
-    meminit((struct mem *) &dirs, sizeof(struct directive), 0);
+    meminit((mem_t *) &dirs, sizeof(struct directive), 0);
 
     scan(&s, &dirs);
     s.cur = s.src;

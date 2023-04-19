@@ -5,7 +5,7 @@
 #include <assert.h>
 
 #include "scanner.h"
-#include "mem.h" // lib
+#include "artmem.h" // lib
 #include "../vm.h" // TODO: make path absolute
 
 static char *opcodes_str[OP_COUNT] = {
@@ -274,7 +274,7 @@ scan_again:
 void scan_tokens(struct scanner *s, struct token_array *ta)
 {
     for (;;) {
-        struct token *t = memnext((struct mem *) ta);
+        struct token *t = memnext((mem_t *) ta);
 
         scan_token(s, t);
         if (t->kind == TOK_EOF) {

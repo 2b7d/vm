@@ -5,7 +5,7 @@
 
 #include "../util.h"
 
-#include "mem.h" // lib
+#include "artmem.h" // lib
 
 struct header {
     int nsyms;
@@ -87,7 +87,7 @@ static void gsymbol_add(char *name, int mod, int num)
         }
     }
 
-    gs = memnext((struct mem *) &gsymbols);
+    gs = memnext((mem_t *) &gsymbols);
 
     gs->name = name;
     gs->module = mod;
@@ -153,7 +153,7 @@ static void read_symbols(struct module *m)
     }
 
     for (int i = 0; i < m->h.nsyms; ++i) {
-        struct sym *s = memnext((struct mem *) &m->sa);
+        struct sym *s = memnext((mem_t *) &m->sa);
 
         s->number = i;
         s->name = m->src;
@@ -177,7 +177,7 @@ static void read_relocations(struct module *m)
     }
 
     for (int i = 0; i < m->h.nrels; ++i) {
-        struct rel *r = memnext((struct mem *) &m->ra);
+        struct rel *r = memnext((mem_t *) &m->ra);
 
         read_bytes(m, &r->loc, 2);
         read_bytes(m, &r->ref, 2);
@@ -255,19 +255,19 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    meminit((struct mem *) &modules, sizeof(struct module), 0);
-    meminit((struct mem *) &gsymbols, sizeof(struct gsym), 16);
+    meminit((mem_t *) &modules, sizeof(struct module), 0);
+    meminit((mem_t *) &gsymbols, sizeof(struct gsym), 16);
 
     start = 0;
     for (int i = 0; *argv != NULL; ++i, ++argv) {
-        struct module *m = memnext((struct mem *) &modules);
+        struct module *m = memnext((mem_t *) &modules);
 
         m->src = read_file(*argv);
         m->start = start;
         m->index = i;
 
-        meminit((struct mem *) &m->sa, sizeof(struct sym), 16);
-        meminit((struct mem *) &m->ra, sizeof(struct rel), 16);
+        meminit((mem_t *) &m->sa, sizeof(struct sym), 16);
+        meminit((mem_t *) &m->ra, sizeof(struct rel), 16);
 
         read_header(m);
 
@@ -276,8 +276,8 @@ int main(int argc, char **argv)
             --i;
             --modules.size;
             free(m->src);
-            memfree((struct mem *) &m->sa);
-            memfree((struct mem *) &m->ra);
+            memfree((mem_t *) &m->sa);
+            memfree((mem_t *) &m->ra);
             continue;
         }
 

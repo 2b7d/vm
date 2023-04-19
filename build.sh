@@ -11,21 +11,21 @@ files=""
 if [ "$name" = "assembler" ]; then
     name="asm"
     files="./assembler/*.c util.c"
-    incl="-I/home/fosseddy/programming/c-sandbox/include"
-    libs="-L/home/fosseddy/programming/c-sandbox/lib -lmem"
+    incl="-I$HOME/programming/c-libs/include"
+    libs="-L$HOME/programming/c-libs/lib -lartmem"
 fi
 
 if [ "$name" = "linker" ]; then
     name="ld"
     files="./linker/*.c util.c"
-    incl="-I/home/fosseddy/programming/c-sandbox/include"
-    libs="-L/home/fosseddy/programming/c-sandbox/lib -lmem"
+    incl="-I$HOME/programming/c-libs/include"
+    libs="-L$HOME/programming/c-libs/lib -lartmem"
 fi
 
 if [ "$name" = "preproc" ]; then
     files="$name.c util.c"
-    incl="-I/home/fosseddy/programming/c-sandbox/include"
-    libs="-L/home/fosseddy/programming/c-sandbox/lib -lmem"
+    incl="-I$HOME/programming/c-libs/include"
+    libs="-L$HOME/programming/c-libs/lib -lartmem"
 fi
 
 if [ "$name" = "vm" ]; then

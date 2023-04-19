@@ -6,7 +6,7 @@
 #include "scanner.h"
 #include "compiler.h"
 
-#include "mem.h" // lib
+#include "artmem.h" // lib
 
 static struct token *peek(struct parser *p)
 {
@@ -87,7 +87,7 @@ static struct sym *find_symbol(struct parser *p, struct token *t)
 static struct sym *add_symbol(struct parser *p, struct token *t)
 {
     int index = p->sa.size;
-    struct sym *s = memnext((struct mem *) &p->sa);
+    struct sym *s = memnext((mem_t *) &p->sa);
 
     s->name = t->lex;
     s->namelen = t->len;
@@ -99,7 +99,7 @@ static struct sym *add_symbol(struct parser *p, struct token *t)
 
 static struct rel *add_rel(struct parser *p, struct sym *s, struct token *t)
 {
-    struct rel *r = memnext((struct mem *) &p->ra);
+    struct rel *r = memnext((mem_t *) &p->ra);
     int index = 0;
     int resolved = 0;
 
@@ -172,7 +172,7 @@ static void emit_bytes(struct parser *p, void *buf, int size)
     int old_size = p->code.size;
 
     p->code.size += size;
-    memgrow((struct mem *) &p->code);
+    memgrow((mem_t *) &p->code);
     memcpy(p->code.buf + old_size, buf, size);
 }
 
@@ -363,8 +363,8 @@ void write_object_file(struct parser *p, char *outpath)
 
 void parser_init(struct parser *p)
 {
-    meminit((struct mem *) &p->ta, sizeof(struct token), 32);
-    meminit((struct mem *) &p->sa, sizeof(struct sym), 16);
-    meminit((struct mem *) &p->ra, sizeof(struct rel), 16);
-    meminit((struct mem *) &p->code, sizeof(uint8_t), 64);
+    meminit((mem_t *) &p->ta, sizeof(struct token), 32);
+    meminit((mem_t *) &p->sa, sizeof(struct sym), 16);
+    meminit((mem_t *) &p->ra, sizeof(struct rel), 16);
+    meminit((mem_t *) &p->code, sizeof(uint8_t), 64);
 }
