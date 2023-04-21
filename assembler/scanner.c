@@ -4,13 +4,16 @@
 #include <limits.h>
 #include <assert.h>
 
+#include <artmem.h> // lib
+
 #include "scanner.h"
-#include "artmem.h" // lib
-#include "../vm.h" // TODO: make path absolute
+#include "../vm.h"
 
 static char *opcodes_str[OP_COUNT] = {
     [OP_ST]      = "st",
     [OP_LD]      = "ld",
+    [OP_STB]     = "stb",
+    [OP_LDB]     = "ldb",
     [OP_ADD]     = "add",
     [OP_SUB]     = "sub",
     [OP_MUL]     = "mul",
@@ -19,6 +22,7 @@ static char *opcodes_str[OP_COUNT] = {
     [OP_INC]     = "inc",
     [OP_DEC]     = "dec",
     [OP_PUSH]    = "push",
+    [OP_PUSHB]   = "pushb",
     [OP_DUP]     = "dup",
     [OP_OVER]    = "over",
     [OP_SWAP]    = "swap",
@@ -37,8 +41,6 @@ static char *opcodes_str[OP_COUNT] = {
     [OP_OR]      = "or",
     [OP_AND]     = "and",
     [OP_NOT]     = "not",
-    [OP_WTB]     = "wtb",
-    [OP_BTW]     = "btw",
     [OP_JMP]     = "jmp",
     [OP_JMPIF]   = "jmpif",
     [OP_HALT]    = "halt",
@@ -49,23 +51,18 @@ static char *opcodes_str[OP_COUNT] = {
 
 static int check_opcode(struct token *t)
 {
-    int is_byte = 0;
-    int len = t->len;
-
-    if (t->lex[len - 1] == '8') {
-        --len;
-        is_byte = 1;
-    }
-
     for (int i = 0; i < OP_COUNT; ++i) {
         char *op = opcodes_str[i];
 
-        if ((size_t) len == strlen(op) && memcmp(op, t->lex, len) == 0) {
+        if ((size_t) t->len == strlen(op) && memcmp(op, t->lex, t->len) == 0) {
             t->kind = TOK_OPCODE;
-            if (is_byte) {
-                t->kind = TOK_OPCODE_BYTE;
-            }
             t->value = i;
+            t->is_byte = 0;
+
+            if (i == OP_STB || i == OP_LDB || i == OP_PUSHB) {
+                t->is_byte = 1;
+            }
+
             return 1;
         }
     }
@@ -113,7 +110,7 @@ static char advance(struct scanner *s)
     char c = peek(s);
 
     if (has_src(s) == 1) {
-        ++s->cur;
+        s->cur++;
     }
 
     return c;
@@ -149,7 +146,7 @@ static void scan_string(struct scanner *s, struct token *t)
 
     make_token(s, t, TOK_STR);
 
-    ++t->lex;
+    t->lex++;
     t->len -= 2;
 
     assert(t->len >= 0);

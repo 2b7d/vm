@@ -10,7 +10,7 @@ opcode_statement -> opcode (number | character | symbol)?
 bytes_expression -> ".bytes" number+
 
 symbol -> char (char | digit)*
-opcode -> lower+ "8"?
+opcode -> lower+
 number -> digit+
 string -> character+
 character -> "<any except ">"

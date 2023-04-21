@@ -6,9 +6,9 @@
 string.len:
     push 0
 len_loop:
-    over over add ld8
+    over over add ldb
 
-    push8 NULL eq8
+    pushb NULL eq
     jmpif len_done
 
     inc

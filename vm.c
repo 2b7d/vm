@@ -6,17 +6,16 @@
 
 enum {
     RAM_CAP = 1 << 16,
-    STACK_CAP = 1 << 8,
-    BRK = RAM_CAP - 2,
-    RSP = RAM_CAP - 4
+    STACK_CAP = 1 << 7,
 };
 
 uint8_t ram[RAM_CAP];
-uint8_t stack[STACK_CAP];
+uint16_t stack[STACK_CAP];
 
 uint16_t pc;
 uint8_t sp;
 uint16_t rsp;
+uint16_t rsbp;
 
 void ramstore8(uint16_t addr, uint8_t val)
 {
@@ -49,68 +48,14 @@ uint16_t ramload(uint16_t addr)
     return (msb << 8) | lsb;
 }
 
-void push8(uint8_t val)
-{
-    stack[sp] = val;
-    ++sp;
-}
-
-uint8_t pop8()
-{
-    return stack[--sp];
-}
-
 void push(uint16_t val)
 {
-    uint8_t lsb, msb;
-
-    lsb = val;
-    msb = val >> 8;
-
-    push8(lsb);
-    push8(msb);
+    stack[sp++] = val;
 }
 
 uint16_t pop()
 {
-    uint8_t lsb, msb;
-
-    msb = pop8();
-    lsb = pop8();
-
-    return (msb << 8) | lsb;
-}
-
-void rspush8(uint8_t val)
-{
-    ramstore8(rsp, val);
-    --rsp;
-}
-
-uint8_t rspop8()
-{
-    return ramload8(++rsp);
-}
-
-void rspush(uint16_t val)
-{
-    uint8_t lsb, msb;
-
-    lsb = val;
-    msb = val >> 8;
-
-    rspush8(msb);
-    rspush8(lsb);
-}
-
-uint16_t rspop()
-{
-    uint8_t lsb, msb;
-
-    lsb = rspop8();
-    msb = rspop8();
-
-    return (msb << 8) | lsb;
+    return stack[--sp];
 }
 
 void load_program(char *pathname)
@@ -120,7 +65,7 @@ void load_program(char *pathname)
 
     f = fopen(pathname, "r");
     if (f == NULL) {
-        puts("ERROR: failed to open binary file");
+        fprintf(stderr, "ERROR: failed to open binary file");
         exit(1);
     }
 
@@ -129,20 +74,20 @@ void load_program(char *pathname)
     i = 0;
     for (;;) {
         if (i >= RAM_CAP) {
-            puts("ERROR: not enough memory to load program");
+            fprintf(stderr, "ERROR: not enough memory to load program");
             exit(1);
         }
 
         fread(ram + i, 1, 1, f);
-        ++i;
+        i++;
 
         if (ferror(f) != 0) {
-            puts("ERROR: failed to read binary file");
+            fprintf(stderr, "ERROR: failed to read binary file");
             exit(1);
         }
 
         if (feof(f) != 0) {
-            ramstore(BRK, i - 1);
+            //ramstore(BRK, i - 1);
             break;
         }
     }
@@ -154,281 +99,195 @@ int main(int argc, char **argv)
 {
     int halt = 0;
 
-    --argc;
-    ++argv;
+    argc--;
+    argv++;
 
     if (argc < 1) {
-        puts("binary file is required");
+        fprintf(stderr, "binary file is required");
         return 1;
     }
 
     pc = 0;
     sp = 0;
-    rsp = RSP;
+
+    // TODO: handle this
+    //rsp = RSP;
+    //rsbp = RSP;
 
     load_program(*argv);
 
     while (halt == 0) {
         uint16_t a, b;
-        uint8_t a8, b8, inst, opcode, mode;
+        uint8_t opcode;
 
-        inst = ramload8(pc);
-        ++pc;
-        opcode = inst & 0x7f;
-        mode = (inst >> 7) & 0x1;
+        opcode = ramload8(pc++);
 
         switch (opcode) {
         case OP_ST:
             a = pop();
-            if (mode == 1) {
-                ramstore(a, pop());
-            } else {
-                ramstore8(a, pop8());
-            }
+            ramstore(a, pop());
             break;
 
         case OP_LD:
-            if (mode == 1) {
-                push(ramload(pop()));
-            } else {
-                push8(ramload8(pop()));
-            }
+            push(ramload(pop()));
+            break;
+
+        case OP_STB:
+            a = pop();
+            ramstore8(a, pop());
+            break;
+
+        case OP_LDB:
+            push(ramload8(pop()));
             break;
 
         case OP_ADD:
-            if (mode == 1) {
-                push(pop() + pop());
-            } else {
-                push8(pop8() + pop8());
-            }
+            push(pop() + pop());
             break;
 
         case OP_SUB:
-            if (mode == 1) {
-                a = pop();
-                push(pop() - a);
-            } else {
-                a8 = pop8();
-                push8(pop8() - a8);
-            }
+            a = pop();
+            push(pop() - a);
             break;
 
         case OP_MUL:
-            if (mode == 1) {
-                push(pop() * pop());
-            } else {
-                push8(pop8() * pop8());
-            }
+            push(pop() * pop());
             break;
 
         case OP_DIV:
-            if (mode == 1) {
-                a = pop();
-                push(pop() / a);
-            } else {
-                a8 = pop8();
-                push8(pop8() / a8);
-            }
+            a = pop();
+            push(pop() / a);
             break;
 
         case OP_MOD:
-            if (mode == 1) {
-                a = pop();
-                push(pop() % a);
-            } else {
-                a8 = pop8();
-                push8(pop8() % a8);
-            }
+            a = pop();
+            push(pop() % a);
             break;
 
         case OP_INC:
-            if (mode == 1) {
-                a = pop();
-                push(a + 1);
-            } else {
-                a8 = pop8();
-                push8(a8 + 1);
-            }
+            push(pop() + 1);
             break;
 
         case OP_DEC:
-            if (mode == 1) {
-                a = pop();
-                push(a - 1);
-            } else {
-                a8 = pop8();
-                push8(a8 - 1);
-            }
+            push(pop() - 1);
             break;
 
         case OP_PUSH:
-            if (mode == 1) {
-                push(ramload(pc));
-                pc += 2;
-            } else {
-                push8(ramload8(pc));
-                ++pc;
-            }
+            push(ramload(pc));
+            pc += 2;
+            break;
+
+        case OP_PUSHB:
+            push(ramload8(pc++));
             break;
 
         case OP_DUP:
-            if (mode == 1) {
-                a = pop();
-                push(a);
-                push(a);
-            } else {
-                a8 = pop8();
-                push8(a8);
-                push8(a8);
-            }
+            a = pop();
+            push(a);
+            push(a);
             break;
 
         case OP_OVER:
-            if (mode == 1) {
-                a = pop();
-                b = pop();
-                push(b);
-                push(a);
-                push(b);
-            } else {
-                a8 = pop8();
-                b8 = pop8();
-                push8(b8);
-                push8(a8);
-                push8(b8);
-            }
+            a = pop();
+            b = pop();
+            push(b);
+            push(a);
+            push(b);
             break;
 
         case OP_SWAP:
-            if (mode == 1) {
-                a = pop();
-                b = pop();
-                push(a);
-                push(b);
-            } else {
-                a8 = pop8();
-                b8 = pop8();
-                push8(a8);
-                push8(b8);
-            }
+            a = pop();
+            b = pop();
+            push(a);
+            push(b);
             break;
 
         case OP_DROP:
-            if (mode == 1) {
-                pop();
-            } else {
-                pop8();
-            }
+            pop();
             break;
 
-        case OP_RSPUSH:
-            if (mode == 1) {
-                rspush(pop());
-            } else {
-                rspush8(pop8());
-            }
-            break;
-
-        case OP_RSPOP:
-            if (mode == 1) {
-                push(rspop());
-            } else {
-                push8(rspop8());
-            }
-            break;
-
-        case OP_RSCOPY:
-            if (mode == 1) {
-                a = rspop();
-                rspush(a);
-                push(a);
-            } else {
-                a8 = rspop8();
-                rspush8(a8);
-                push8(a8);
-            }
-            break;
-
-        case OP_RSDROP:
-            if (mode == 1) {
-                rspop();
-            } else {
-                rspop8();
-            }
-            break;
-
-        case OP_RSP:
-            push(rsp);
-            break;
-
-        case OP_RSPSET:
-            rsp = pop();
-            break;
-
-        case OP_BRK:
-            push(ramload(BRK));
-            break;
-
-        case OP_BRKSET:
-            a = ramload(BRK);
-            ramstore(BRK, pop());
-            push(a);
-            break;
+//        case OP_RSPUSH:
+//            if (mode == 1) {
+//                rspush(pop());
+//            } else {
+//                rspush8(pop8());
+//            }
+//            break;
+//
+//        case OP_RSPOP:
+//            if (mode == 1) {
+//                push(rspop());
+//            } else {
+//                push8(rspop8());
+//            }
+//            break;
+//
+//        case OP_RSCOPY:
+//            if (mode == 1) {
+//                a = rspop();
+//                rspush(a);
+//                push(a);
+//            } else {
+//                a8 = rspop8();
+//                rspush8(a8);
+//                push8(a8);
+//            }
+//            break;
+//
+//        case OP_RSDROP:
+//            if (mode == 1) {
+//                rspop();
+//            } else {
+//                rspop8();
+//            }
+//            break;
+//
+//        case OP_RSP:
+//            push(rsp);
+//            break;
+//
+//        case OP_RSPSET:
+//            rsp = pop();
+//            break;
+//
+//        case OP_BRK:
+//            push(ramload(BRK));
+//            break;
+//
+//        case OP_BRKSET:
+//            a = ramload(BRK);
+//            ramstore(BRK, pop());
+//            push(a);
+//            break;
 
         case OP_EQ:
-            if (mode == 1) {
-                push8(pop() == pop());
-            } else {
-                push8(pop8() == pop8());
-            }
+            push(pop() == pop());
             break;
 
         case OP_GT:
-            if (mode == 1) {
-                a = pop();
-                push8(pop() > a);
-            } else {
-                a8 = pop8();
-                push8(pop8() > a8);
-            }
+            a = pop();
+            push(pop() > a);
             break;
 
         case OP_LT:
-            if (mode == 1) {
-                a = pop();
-                push8(pop() < a);
-            } else {
-                a8 = pop8();
-                push8(pop8() < a8);
-            }
+            a = pop();
+            push(pop() < a);
             break;
 
         case OP_OR:
-            a8 = pop8();
-            b8 = pop8();
-            push8(a8 || b8);
+            a = pop();
+            b = pop();
+            push(a || b);
             break;
 
         case OP_AND:
-            a8 = pop8();
-            b8 = pop8();
-            push8(a8 && b8);
+            a = pop();
+            b = pop();
+            push(a && b);
             break;
 
         case OP_NOT:
-            push8(!pop8());
-            break;
-
-        case OP_WTB:
-            a = pop();
-            a8 = a;
-            push8(a8);
-            break;
-
-        case OP_BTW:
-            a8 = pop8();
-            a = a8;
-            push(a);
+            push(!pop());
             break;
 
         case OP_JMP:
@@ -438,7 +297,7 @@ int main(int argc, char **argv)
         case OP_JMPIF:
             a = ramload(pc);
             pc += 2;
-            if (pop8() == 1) {
+            if (pop() == 1) {
                 pc = a;
             }
             break;
@@ -460,25 +319,27 @@ int main(int argc, char **argv)
                 break;
 
             case SYS_READ:
+                fprintf(stderr, "ERROR: SYS_READ not implemented\n");
+                exit(1);
             default:
-                printf("ERROR: unknown vm_syscall(%u)\n", a);
+                fprintf(stderr, "ERROR: unknown vm_syscall(%u)\n", a);
                 exit(1);
             }
             break;
 
-        case OP_CALL:
-            a = ramload(pc);
-            pc += 2;
-            rspush(pc);
-            pc = a;
-            break;
-
-        case OP_RET:
-            pc = rspop();
-            break;
+//        case OP_CALL:
+//            a = ramload(pc);
+//            pc += 2;
+//            rspush(pc);
+//            pc = a;
+//            break;
+//
+//        case OP_RET:
+//            pc = rspop();
+//            break;
 
         default:
-            printf("ERROR: unknown vm_opcode(%u)\n", opcode);
+            fprintf(stderr, "ERROR: unknown vm_opcode(%u)\n", opcode);
             exit(1);
         }
     }

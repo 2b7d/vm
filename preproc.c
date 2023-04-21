@@ -18,7 +18,7 @@ struct directive {
 };
 
 struct directive_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct directive *buf;
@@ -88,7 +88,7 @@ void process_directives(char *pathname, struct scanner *s,
         exit(1);
     }
 
-    for (int i = 0; i < dirs->size; ++i) {
+    for (int i = 0; i < dirs->len; ++i) {
         struct directive *d = dirs->buf + i;
         char *end = d->start + d->len;
 
@@ -105,7 +105,7 @@ void process_directives(char *pathname, struct scanner *s,
     while (*s->cur != '\0') {
         if (s->cur < last_dir) {
             // remove declaration
-            for (int i = 0; i < dirs->size; ++i) {
+            for (int i = 0; i < dirs->len; ++i) {
                 struct directive *d = dirs->buf + i;
 
                 if (s->cur == d->start) {
@@ -115,7 +115,7 @@ void process_directives(char *pathname, struct scanner *s,
             }
         }
 
-        for (int i = 0; i < dirs->size; ++i) {
+        for (int i = 0; i < dirs->len; ++i) {
             struct directive *d = dirs->buf + i;
 
             if (*s->cur == *d->name) {

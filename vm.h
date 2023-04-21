@@ -2,6 +2,9 @@ enum vm_opcode {
     OP_ST,       // a ptr ->
     OP_LD,       // ptr -> a
 
+    OP_STB,      // a ptr8 ->
+    OP_LDB,      // ptr8 -> a
+
     OP_ADD,      // a b -> c
     OP_SUB,      // a b -> c
     OP_MUL,      // a b -> c
@@ -11,10 +14,12 @@ enum vm_opcode {
     OP_DEC,      // a -> b
 
     OP_PUSH,     // -> a
+    OP_PUSHB,    // -> a
     OP_DUP,      // a -> a a
     OP_OVER,     // a b -> a b a
     OP_SWAP,     // a b -> b a
     OP_DROP,     // a ->
+
     OP_RSPUSH,   // a ->
     OP_RSPOP,    // -> a
     OP_RSCOPY,   // -> a
@@ -31,9 +36,6 @@ enum vm_opcode {
     OP_OR,       // a b -> c
     OP_AND,      // a b -> c
     OP_NOT,      // a -> b
-
-    OP_WTB,      // a -> a8
-    OP_BTW,      // a8 -> a
 
     OP_JMP,      // ->
     OP_JMPIF,    // a ->

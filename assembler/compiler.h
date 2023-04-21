@@ -16,7 +16,7 @@ struct sym {
 };
 
 struct sym_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct sym *buf;
@@ -33,7 +33,7 @@ struct rel {
 };
 
 struct rel_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct rel *buf;
@@ -46,7 +46,7 @@ struct parser {
     struct sym_array sa;
     struct rel_array ra;
     struct {
-        int size;
+        int len;
         int cap;
         int data_size;
         uint8_t *buf;

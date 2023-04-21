@@ -5,7 +5,6 @@ enum token_kind {
 
     TOK_SYMBOL,
     TOK_OPCODE,
-    TOK_OPCODE_BYTE,
     TOK_NUM,
     TOK_STR,
 
@@ -19,10 +18,11 @@ struct token {
     char *lex;
     int len;
     int value;
+    int is_byte;
 };
 
 struct token_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct token *buf;

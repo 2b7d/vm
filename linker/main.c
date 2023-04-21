@@ -21,7 +21,7 @@ struct sym {
 };
 
 struct sym_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct sym *buf;
@@ -33,7 +33,7 @@ struct rel {
 };
 
 struct rel_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct rel *buf;
@@ -54,7 +54,7 @@ struct module {
 };
 
 struct module_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct module *buf;
@@ -67,7 +67,7 @@ struct gsym {
 };
 
 struct gsym_array {
-    int size;
+    int len;
     int cap;
     int data_size;
     struct gsym *buf;
@@ -80,7 +80,7 @@ static void gsymbol_add(char *name, int mod, int num)
 {
     struct gsym *gs;
 
-    for (int i = 0; i < gsymbols.size; ++i) {
+    for (int i = 0; i < gsymbols.len; ++i) {
         if (strcmp(gsymbols.buf[i].name, name) == 0) {
             fprintf(stderr, "global symbol %s already defined\n", name);
             exit(1);
@@ -96,7 +96,7 @@ static void gsymbol_add(char *name, int mod, int num)
 
 static struct gsym *gsymbol_get(char *name)
 {
-    for (int i = 0; i < gsymbols.size; ++i) {
+    for (int i = 0; i < gsymbols.len; ++i) {
         if (strcmp(gsymbols.buf[i].name, name) == 0) {
             return gsymbols.buf + i;
         }
@@ -188,14 +188,14 @@ static void read_relocations(struct module *m)
 
 static void relocate_symbols(struct module *m)
 {
-    for (int i = 0; i < m->ra.size; ++i) {
+    for (int i = 0; i < m->ra.len; ++i) {
         struct rel *r = m->ra.buf + i;
         struct sym *s;
         int addr;
 
         assert(r->ref >= 0);
 
-        if (r->ref >= m->sa.size) {
+        if (r->ref >= m->sa.len) {
             fprintf(stderr, "invalid relocation reference {loc: %d ref: %d}\n",
                             r->loc, r->ref);
             exit(1);
@@ -234,7 +234,7 @@ static void write_vm_executable()
 
     fwrite(&entry_addr, 2, 1, out);
 
-    for (int i = 0; i < modules.size; ++i) {
+    for (int i = 0; i < modules.len; ++i) {
         struct module *m = modules.buf + i;
 
         fwrite(m->code, 1, m->h.ncode, out);
@@ -273,8 +273,8 @@ int main(int argc, char **argv)
 
         if (m->h.ncode == 0) {
             fprintf(stdout, "%s is empty; skipping\n", *argv);
-            --i;
-            --modules.size;
+            i--;
+            modules.len--;
             free(m->src);
             memfree((mem_t *) &m->sa);
             memfree((mem_t *) &m->ra);
@@ -288,7 +288,7 @@ int main(int argc, char **argv)
         start += m->h.ncode;
     }
 
-    for (int i = 0; i < modules.size; ++i) {
+    for (int i = 0; i < modules.len; ++i) {
         relocate_symbols(modules.buf + i);
     }
 

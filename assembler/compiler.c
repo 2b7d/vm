@@ -3,10 +3,10 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <artmem.h> // lib
+
 #include "scanner.h"
 #include "compiler.h"
-
-#include "artmem.h" // lib
 
 static struct token *peek(struct parser *p)
 {
@@ -73,7 +73,7 @@ static struct token *consume(struct parser *p, enum token_kind k, char *name)
 
 static struct sym *find_symbol(struct parser *p, struct token *t)
 {
-    for (int i = 0; i < p->sa.size; ++i) {
+    for (int i = 0; i < p->sa.len; ++i) {
         struct sym *s = p->sa.buf + i;
 
         if (t->len == s->namelen && memcmp(s->name, t->lex, t->len) == 0) {
@@ -86,7 +86,7 @@ static struct sym *find_symbol(struct parser *p, struct token *t)
 
 static struct sym *add_symbol(struct parser *p, struct token *t)
 {
-    int index = p->sa.size;
+    int index = p->sa.len;
     struct sym *s = memnext((mem_t *) &p->sa);
 
     s->name = t->lex;
@@ -108,7 +108,7 @@ static struct rel *add_rel(struct parser *p, struct sym *s, struct token *t)
         index = s->index;
     }
 
-    r->loc = p->code.size;
+    r->loc = p->code.len;
     r->ref = index;
     r->is_resolved = resolved;
     r->name = t->lex;
@@ -153,10 +153,10 @@ static void resolve_symbol(struct parser *p, struct token *decl)
         s = add_symbol(p, decl);
         s->type = TYPE_LOCAL;
     }
-    s->value = p->code.size;
+    s->value = p->code.len;
     s->is_resolved = 1;
 
-    for (int i = 0; i < p->ra.size; ++i) {
+    for (int i = 0; i < p->ra.len; ++i) {
         struct rel *r = p->ra.buf + i;
 
         if (s->namelen == r->namelen &&
@@ -169,22 +169,21 @@ static void resolve_symbol(struct parser *p, struct token *decl)
 
 static void emit_bytes(struct parser *p, void *buf, int size)
 {
-    int old_size = p->code.size;
+    int old_len = p->code.len;
 
-    p->code.size += size;
+    p->code.len += size;
     memgrow((mem_t *) &p->code);
-    memcpy(p->code.buf + old_size, buf, size);
+    memcpy(p->code.buf + old_len, buf, size);
 }
 
 static void opcode_statement(struct parser *p, struct token *opcode)
 {
     int valsize = 2;
-    uint8_t op = (1 << 7) | (opcode->value & 0xff);
+    uint8_t op = opcode->value;
     enum token_kind expected_kinds[3] = {TOK_NUM, TOK_STR, TOK_SYMBOL};
 
-    if (opcode->kind == TOK_OPCODE_BYTE) {
+    if (opcode->is_byte == 1) {
         valsize = 1;
-        op = opcode->value;
     }
 
     emit_bytes(p, &op, 1);
@@ -231,7 +230,7 @@ static void opcode_statement(struct parser *p, struct token *opcode)
 static void symbol_declaration(struct parser *p)
 {
     enum token_kind expected_kinds[5] = {TOK_STR, TOK_NUM, TOK_BYTES,
-                                         TOK_OPCODE, TOK_OPCODE_BYTE};
+                                         TOK_OPCODE};
 
     consume(p, TOK_COLON, ":");
 
@@ -240,7 +239,6 @@ static void symbol_declaration(struct parser *p)
 
         switch (t->kind) {
         case TOK_OPCODE:
-        case TOK_OPCODE_BYTE:
             opcode_statement(p, t);
             break;
 
@@ -302,7 +300,7 @@ void compile(struct parser *p)
         }
     }
 
-    for (int i = 0; i < p->sa.size; ++i) {
+    for (int i = 0; i < p->sa.len; ++i) {
         struct sym *s = p->sa.buf + i;
         if (s->is_resolved == 0) {
             fprintf(stderr, "undefined symbol %.*s\n", s->namelen, s->name);
@@ -310,7 +308,7 @@ void compile(struct parser *p)
         }
     }
 
-    for (int i = 0; i < p->ra.size; ++i) {
+    for (int i = 0; i < p->ra.len; ++i) {
         struct rel *r = p->ra.buf + i;
         if (r->is_resolved == 0) {
             fprintf(stderr, "undefined symbol %.*s\n", r->namelen, r->name);
@@ -330,13 +328,13 @@ void write_object_file(struct parser *p, char *outpath)
         exit(1);
     }
 
-    fwrite(&p->sa.size, 2, 1, out);
-    fwrite(&p->ra.size, 2, 1, out);
-    fwrite(&p->code.size, 2, 1, out);
+    fwrite(&p->sa.len, 2, 1, out);
+    fwrite(&p->ra.len, 2, 1, out);
+    fwrite(&p->code.len, 2, 1, out);
 
     fwrite(&separator, 1, 1, out);
 
-    for (int i = 0; i < p->sa.size; ++i) {
+    for (int i = 0; i < p->sa.len; ++i) {
         struct sym *s = p->sa.buf + i;
 
         fwrite(s->name, 1, s->namelen, out);
@@ -348,7 +346,7 @@ void write_object_file(struct parser *p, char *outpath)
 
     fwrite(&separator, 1, 1, out);
 
-    for (int i = 0; i < p->ra.size; ++i) {
+    for (int i = 0; i < p->ra.len; ++i) {
         struct rel *r = p->ra.buf + i;
 
         fwrite(&r->loc, 2, 1, out);
@@ -357,7 +355,7 @@ void write_object_file(struct parser *p, char *outpath)
 
     fwrite(&separator, 1, 1, out);
 
-    fwrite(p->code.buf, 1, p->code.size, out);
+    fwrite(p->code.buf, 1, p->code.len, out);
     fclose(out);
 }
 
