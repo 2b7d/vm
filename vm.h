@@ -24,11 +24,14 @@ enum vm_opcode {
     OP_RSPOP,    // -> a
     OP_RSCOPY,   // -> a
     OP_RSDROP,   // ->
+
     OP_RSP,      // -> ptr
     OP_RSPSET,   // ptr ->
-                 //
-    OP_BRK,      // -> ptr
-    OP_BRKSET,   // ptr -> ptr
+    OP_RBP,      // -> ptr
+    OP_RBPSET,   // ptr ->
+
+    //OP_BRK,      // -> ptr
+    //OP_BRKSET,   // ptr -> ptr
 
     OP_EQ,       // a b -> c
     OP_GT,       // a b -> c

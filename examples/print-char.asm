@@ -4,13 +4,13 @@
 .extern io.putc
 
 _start:
-    push8 "6"
+    pushb "6"
     call io.putc
 
-    push8 "9"
+    pushb "9"
     call io.putc
 
-    push8 LF
+    pushb LF
     call io.putc
 
     halt

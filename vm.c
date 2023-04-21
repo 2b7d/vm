@@ -15,7 +15,7 @@ uint16_t stack[STACK_CAP];
 uint16_t pc;
 uint8_t sp;
 uint16_t rsp;
-uint16_t rsbp;
+uint16_t rbp;
 
 void ramstore8(uint16_t addr, uint8_t val)
 {
@@ -56,6 +56,19 @@ void push(uint16_t val)
 uint16_t pop()
 {
     return stack[--sp];
+}
+
+void rspush(uint16_t val)
+{
+    rsp -= 2;
+    ramstore(rsp, val);
+}
+
+uint16_t rspop()
+{
+    uint16_t val = ramload(rsp);
+    rsp += 2;
+    return val;
 }
 
 void load_program(char *pathname)
@@ -110,17 +123,14 @@ int main(int argc, char **argv)
     pc = 0;
     sp = 0;
 
-    // TODO: handle this
-    //rsp = RSP;
-    //rsbp = RSP;
+    rsp = RAM_CAP - 1;
+    rbp = rsp;
 
     load_program(*argv);
 
     while (halt == 0) {
         uint16_t a, b;
-        uint8_t opcode;
-
-        opcode = ramload8(pc++);
+        enum vm_opcode opcode = ramload8(pc++);
 
         switch (opcode) {
         case OP_ST:
@@ -206,50 +216,40 @@ int main(int argc, char **argv)
             pop();
             break;
 
-//        case OP_RSPUSH:
-//            if (mode == 1) {
-//                rspush(pop());
-//            } else {
-//                rspush8(pop8());
-//            }
-//            break;
-//
-//        case OP_RSPOP:
-//            if (mode == 1) {
-//                push(rspop());
-//            } else {
-//                push8(rspop8());
-//            }
-//            break;
-//
-//        case OP_RSCOPY:
-//            if (mode == 1) {
-//                a = rspop();
-//                rspush(a);
-//                push(a);
-//            } else {
-//                a8 = rspop8();
-//                rspush8(a8);
-//                push8(a8);
-//            }
-//            break;
-//
-//        case OP_RSDROP:
-//            if (mode == 1) {
-//                rspop();
-//            } else {
-//                rspop8();
-//            }
-//            break;
-//
-//        case OP_RSP:
-//            push(rsp);
-//            break;
-//
-//        case OP_RSPSET:
-//            rsp = pop();
-//            break;
-//
+        case OP_RSPUSH:
+            rspush(pop());
+            break;
+
+        case OP_RSPOP:
+            push(rspop());
+            break;
+
+        case OP_RSCOPY:
+            a = rspop();
+            rspush(a);
+            push(a);
+            break;
+
+        case OP_RSDROP:
+            rspop();
+            break;
+
+        case OP_RSP:
+            push(rsp);
+            break;
+
+        case OP_RSPSET:
+            rsp = pop();
+            break;
+
+        case OP_RBP:
+            push(rbp);
+            break;
+
+        case OP_RBPSET:
+            rbp = pop();
+            break;
+
 //        case OP_BRK:
 //            push(ramload(BRK));
 //            break;
@@ -327,16 +327,16 @@ int main(int argc, char **argv)
             }
             break;
 
-//        case OP_CALL:
-//            a = ramload(pc);
-//            pc += 2;
-//            rspush(pc);
-//            pc = a;
-//            break;
-//
-//        case OP_RET:
-//            pc = rspop();
-//            break;
+        case OP_CALL:
+            a = ramload(pc);
+            pc += 2;
+            rspush(pc);
+            pc = a;
+            break;
+
+        case OP_RET:
+            pc = rspop();
+            break;
 
         default:
             fprintf(stderr, "ERROR: unknown vm_opcode(%u)\n", opcode);

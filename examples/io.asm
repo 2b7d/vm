@@ -1,16 +1,17 @@
 #define SYS_write 1
 
-.global io.putc, io.puts, io.putn
-.extern string.len, strconv.itoa
+.global io.putc, io.puts;, io.putn
+.extern string.len;, strconv.itoa
 
-; a8 ->
+; a ->
 io.putc:
-    rspush8 ; +1 a8
+    rsp push 1 sub rspset
+    rsp stb
 
-    rsp push 1 add push 1
+    rsp push 1
     syscall SYS_write
 
-    rsdrop8
+    rsp push 1 add rspset
     ret
 
 ; ptr8 ->
@@ -20,12 +21,12 @@ io.puts:
     ret
 
 ; a ->
-io.putn:
-    rsp push 6 sub rspset ; +1 buf
-
-    rsp push 1 add
-    call strconv.itoa
-    syscall SYS_write
-
-    rsp push 6 add rspset
-    ret
+;io.putn:
+;    rsp push 6 sub rspset ; buf
+;
+;    rsp
+;    call strconv.itoa
+;    syscall SYS_write
+;
+;    rsp push 6 add rspset
+;    ret
