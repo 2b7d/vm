@@ -1,7 +1,6 @@
 enum vm_opcode {
     OP_ST,       // a ptr ->
     OP_LD,       // ptr -> a
-
     OP_STB,      // a ptr8 ->
     OP_LDB,      // ptr8 -> a
 
@@ -20,19 +19,6 @@ enum vm_opcode {
     OP_SWAP,     // a b -> b a
     OP_DROP,     // a ->
 
-    OP_RSPUSH,   // a ->
-    OP_RSPOP,    // -> a
-    OP_RSCOPY,   // -> a
-    OP_RSDROP,   // ->
-
-    OP_RSP,      // -> ptr
-    OP_RSPSET,   // ptr ->
-    OP_RBP,      // -> ptr
-    OP_RBPSET,   // ptr ->
-
-    //OP_BRK,      // -> ptr
-    //OP_BRKSET,   // ptr -> ptr
-
     OP_EQ,       // a b -> c
     OP_GT,       // a b -> c
     OP_LT,       // a b -> c
@@ -43,11 +29,11 @@ enum vm_opcode {
     OP_JMP,      // ->
     OP_JMPIF,    // a ->
 
-    OP_HALT,     // ->
-
-    OP_SYSCALL,  // vm_syscall
     OP_CALL,     // ->
     OP_RET,      // ->
+    OP_SYSCALL,  // vm_syscall
+
+    OP_HALT,     // ->
 
     OP_COUNT
 };
