@@ -1,39 +1,16 @@
 #!/bin/bash
 
-set -e
+set -xe
 
-name=$1
+files=vm.c
+outname=vm
+
 flags="-g -Werror=declaration-after-statement -Wall -Wextra -pedantic -std=c99"
-libs=
 incl=
-files=
+libs=
 
-if [[ $name = "assembler" ]]; then
-    name="asm"
-    files="./assembler/*.c util.c"
-    incl="-I$HOME/programming/c-libs/include"
-    libs="-L$HOME/programming/c-libs/lib -lartmem"
-fi
-
-if [[ $name = "linker" ]]; then
-    name="ld"
-    files="./linker/*.c util.c"
-    incl="-I$HOME/programming/c-libs/include"
-    libs="-L$HOME/programming/c-libs/lib -lartmem"
-fi
-
-if [[ $name = "preproc" ]]; then
-    files="$name.c util.c"
-    incl="-I$HOME/programming/c-libs/include"
-    libs="-L$HOME/programming/c-libs/lib -lartmem"
-fi
-
-if [[ $name = "vm" ]]; then
-    files="vm.c"
-fi
-
-if [[ $2 = "prod" ]]; then
+if [[ $1 = "prod" ]]; then
     flags=${flags/-g/-O2}
 fi
 
-gcc $flags -o $name $files $incl $libs
+gcc $flags -o $outname $files $incl $libs

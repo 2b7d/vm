@@ -1,6 +1,2 @@
-preproc
-asm
-ld
+__old
 vm
-a.out
-*.i
