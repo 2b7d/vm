@@ -5,7 +5,7 @@ set -xe
 files=vm.c
 outname=vm
 
-flags="-g -Werror=declaration-after-statement -Wall -Wextra -pedantic -std=c99"
+flags="-g -Werror=declaration-after-statement -Werror=switch-enum -Werror=switch-default -Wall -Wextra -pedantic -std=c99"
 incl=
 libs=
 
