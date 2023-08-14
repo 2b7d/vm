@@ -17,8 +17,8 @@ enum vm_segment {
 enum vm_opcode {
     OP_HALT = 0,
 
-    OP_PUSH, // seg(1),value(2)
-    OP_POP,  // seg(1),value(2)
+    OP_PUSH,
+    OP_POP,
 
     OP_ADD,
     OP_SUB,
@@ -26,7 +26,12 @@ enum vm_opcode {
     OP_DIV,
     OP_MOD,
 
+    OP_EQ,
+    OP_LT,
+    OP_GT,
+
     OP_JMP,
+    OP_CJMP
 };
 
 byte ram[RAM_CAP];
@@ -39,13 +44,11 @@ int local_start;
 
 byte ram_readb(word addr)
 {
-    // TODO(art): validate addr
     return ram[addr];
 }
 
 void ram_writeb(word addr, byte value)
 {
-    // TODO(art): validate addr
     ram[addr] = value;
 }
 
@@ -192,8 +195,30 @@ int main(void)
             w1 = pop();
             push(w1 % w2);
             break;
+        case OP_EQ:
+            w2 = pop();
+            w1 = pop();
+            push(w1 == w2);
+            break;
+        case OP_LT:
+            w2 = pop();
+            w1 = pop();
+            push(w1 < w2);
+            break;
+        case OP_GT:
+            w2 = pop();
+            w1 = pop();
+            push(w1 > w2);
+            break;
         case OP_JMP:
             ip = pop();
+            break;
+        case OP_CJMP:
+            w1 = pop();
+            w2 = pop();
+            if (w2 == 1) {
+                ip = w1;
+            }
             break;
         case OP_HALT:
             halted = 1;
