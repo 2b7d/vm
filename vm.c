@@ -1,110 +1,199 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 
-typedef uint8_t u8;
-typedef uint16_t u16;
+typedef uint8_t byte;
+typedef uint16_t word;
 
 enum {
     RAM_CAP = 1 << 16
 };
 
+enum vm_segment {
+    SEG_CONST = 0,
+    SEG_LOCAL
+};
+
 enum vm_opcode {
     OP_HALT = 0,
 
-    OP_IRMOV, // value(2)dest4(1)
-    OP_RRMOV, // src4,dest4(1)
-    OP_MRMOV, // src4,dest4(1)
-    OP_RMMOV, // src4,dest4(1)
-    OP_ADD,   // src4,dest4(1)
+    OP_PUSH, // seg(1),value(2)
+    OP_POP,  // seg(1),value(2)
+
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_MOD,
+
+    OP_JMP,
 };
 
-enum vm_reg {
-    R1 = 0,
-    R2,
-    R3,
-    R4,
+byte ram[RAM_CAP];
+word ip;
+word sp;
+word lcp;
 
-    RSP,
-    RBP,
-    RIP,
+int stack_start;
+int local_start;
 
-    // TODO(art): flags register?
-    VM_REG_COUNT
-};
-
-u8 ram[RAM_CAP];
-u16 regs[VM_REG_COUNT];
-
-u8 read8(u16 addr)
+byte ram_readb(word addr)
 {
     // TODO(art): validate addr
     return ram[addr];
 }
 
-u16 read16(u8 addr)
+void ram_writeb(word addr, byte value)
 {
-    u8 lsb, msb;
+    // TODO(art): validate addr
+    ram[addr] = value;
+}
 
-    lsb = read8(addr);
-    msb = read8(addr + 1);
+word ram_read(word addr)
+{
+    byte lsb, msb;
+
+    lsb = ram_readb(addr);
+    msb = ram_readb(addr + 1);
 
     return (msb << 8) | lsb;
 }
 
+void ram_write(word addr, word value)
+{
+    byte lsb, msb;
+
+    lsb = value;
+    msb = value >> 8;
+
+    ram_writeb(addr, lsb);
+    ram_writeb(addr + 1, msb);
+}
+
+void push(word value)
+{
+    // TODO(art): check overflow
+    ram_write(sp, value);
+    sp += 2;
+}
+
+word pop()
+{
+    // TODO(art): check underflow
+    sp -= 2;
+    return ram_read(sp);
+}
+
+void dump_mem(char *label, int start, int size)
+{
+    printf("%s: ", label);
+    for (int i = start; i < start + size; ++i) {
+        printf("%d ", ram[i]);
+    }
+    printf("\n");
+}
+
 int main(void)
 {
-    u16 i = 0;
-    int halted = 0;
+    int i, halted;
 
-    // irmov $4 r1
-    ram[i++] = 0x01;
-    ram[i++] = 0x04;
-    ram[i++] = 0x00;
-    ram[i++] = 0x00;
+    halted = 0;
+    i = 0;
 
-    // irmov $6 r2
-    ram[i++] = 0x01;
-    ram[i++] = 0x06;
-    ram[i++] = 0x00;
-    ram[i++] = 0x01;
+    ram_writeb(i, OP_PUSH); i++;
+    ram_writeb(i, SEG_CONST); i++;
+    ram_write(i, 5); i+=2;
 
-    // add r2, r1
-    ram[i++] = 0x05;
-    ram[i++] = (0x01 << 4) | 0x00;
+    ram_writeb(i, OP_PUSH); i++;
+    ram_writeb(i, SEG_CONST); i++;
+    ram_write(i, 9); i+=2;
 
-    // halt
-    ram[i++] = 0x00;
+    ram_writeb(i, OP_ADD); i++;
 
-    regs[RIP] = 0;
+    ram_writeb(i, OP_HALT); i++;
+
+    ip = 0;
+    sp = i;
+    lcp = sp + 4096; // TODO(art): make it constant
+
+    stack_start = sp;
+    local_start = lcp;
+
+    dump_mem("Stack", stack_start, sp - stack_start);
+    dump_mem("Local", local_start, 10);
+    printf("\n");
 
     while (!halted) {
-        enum vm_reg src, dest;
-        u8 byte;
-        u16 word;
+        enum vm_opcode op;
+        enum vm_segment seg;
+        word w1, w2;
 
-        enum vm_opcode op = read8(regs[RIP]++);
+        op = ram_readb(ip++);
 
         switch (op) {
-        case OP_IRMOV:
-            word = read16(regs[RIP]);
-            regs[RIP] += 2;
-            dest = read8(regs[RIP]++);
-            regs[dest] = word;
+        case OP_PUSH:
+            seg = ram_readb(ip++);
+            w1 = ram_read(ip);
+            ip += 2;
+
+            switch (seg) {
+            case SEG_CONST:
+                push(w1);
+                break;
+            case SEG_LOCAL:
+                w2 = ram_read(lcp + w1 * 2);
+                push(w2);
+                break;
+            default:
+                fprintf(stderr, "unknown segment %d\n", seg);
+                exit(1);
+            }
             break;
-        case OP_RRMOV:
-            printf("OP_RRMOV: not implementd\n");
-            break;
-        case OP_MRMOV:
-            printf("OP_MRMOV: not implementd\n");
-            break;
-        case OP_RMMOV:
-            printf("OP_RMMOV: not implementd\n");
+        case OP_POP:
+            seg = ram_readb(ip++);
+            w1 = ram_read(ip);
+            ip += 2;
+
+            switch (seg) {
+            case SEG_CONST:
+                fprintf(stderr, "pop from constant segment\n");
+                exit(1);
+            case SEG_LOCAL:
+                w2 = pop();
+                ram_write(lcp + w1 * 2, w2);
+                break;
+            default:
+                fprintf(stderr, "unknown segment %d\n", seg);
+                exit(1);
+            }
             break;
         case OP_ADD:
-            byte = read8(regs[RIP]++);
-            src = byte >> 4;
-            dest = byte & 0xf;
-            regs[dest] = regs[dest] + regs[src];
+            w2 = pop();
+            w1 = pop();
+            push(w1 + w2);
+            break;
+        case OP_SUB:
+            w2 = pop();
+            w1 = pop();
+            push(w1 - w2);
+            break;
+        case OP_MUL:
+            w2 = pop();
+            w1 = pop();
+            push(w1 * w2);
+            break;
+        case OP_DIV:
+            w2 = pop();
+            w1 = pop();
+            push(w1 / w2);
+            break;
+        case OP_MOD:
+            w2 = pop();
+            w1 = pop();
+            push(w1 % w2);
+            break;
+        case OP_JMP:
+            ip = pop();
             break;
         case OP_HALT:
             halted = 1;
@@ -113,6 +202,10 @@ int main(void)
             fprintf(stderr, "unknown opcode: %d\n", op);
             return 1;
         }
+
+        dump_mem("Stack", stack_start, sp - stack_start);
+        dump_mem("Local", local_start, 10);
+        printf("\n");
     }
 
     return 0;
