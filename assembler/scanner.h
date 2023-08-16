@@ -16,6 +16,8 @@ enum token_kind {
     TOK_SYMBOL,
     TOK_NUM,
 
+    TOK_COLON,
+
     TOK_EOF
 };
 
@@ -29,3 +31,4 @@ struct token {
 char *tok_to_str(enum token_kind kind);
 void make_scanner(struct scanner *s, char *filepath);
 void scan_token(struct scanner *s, struct token *tok);
+void undo_scan(struct scanner *s);

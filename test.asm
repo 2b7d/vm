@@ -1,13 +1,21 @@
 // this is comment
 
-pushb 5
+pushb 7
 pushb 10
-addb
-ctw
+gtb
+push do_add
+cjmp
 
-push 20 // and this is comment too
-add
-ctb
+pushb 6
+pushb 4
+subb
+push exit
+jmp
 
-halt
-// comment
+do_add:
+    pushb 4
+    pushb 6
+    addb
+
+exit:
+    halt // comment

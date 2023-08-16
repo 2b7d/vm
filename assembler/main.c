@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include "../lib/mem.h"
+
 #include "scanner.h"
 #include "../vm.h"
 #include "parser.h"
@@ -8,6 +10,8 @@ int main(int argc, char **argv)
 {
     struct parser p;
     struct inst inst;
+    struct symtable st;
+
     FILE *out;
 
     argc--;
@@ -25,8 +29,11 @@ int main(int argc, char **argv)
     }
 
     make_parser(&p, *argv);
+    meminit(&st, sizeof(struct symbol), 128);
 
-    while (parse_instruction(&p, &inst) == 1) {
+    populate_symbols(&p, &st);
+
+    while (parse_instruction(&p, &st, &inst) == 1) {
         fwrite(&inst.opcode, 1, 1, out);
         if (inst.opcode == OP_PUSH || inst.opcode == OP_PUSHB) {
             fwrite(&inst.operand, inst.operand_size, 1, out);

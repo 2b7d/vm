@@ -15,7 +15,7 @@ if [[ $1 = "vm" ]]; then
 fi
 
 if [[ $1 = "asm" ]]; then
-    files="assembler/*.c lib/os.c"
+    files="assembler/*.c lib/os.c lib/mem.c"
     outname=asm
 fi
 

@@ -25,6 +25,15 @@ static int next(struct scanner *s, char ch)
     return next < s->src_len && s->src[next] == ch;
 }
 
+static void make_token(struct scanner *s, struct token *t,
+                       enum token_kind kind)
+{
+    t->kind = kind;
+    t->lex = s->src + s->pos;
+    t->lex_len = s->cur - s->pos;
+    t->line = s->line;
+}
+
 static int is_digit(char ch)
 {
     return ch >= '0' && ch <= '9';
@@ -71,28 +80,25 @@ scan_again:
         }
         goto scan_error;
 
+    case ':':
+        make_token(s, tok, TOK_COLON);
+        advance(s);
+        break;
+
     default:
         if (is_char(s->ch) == 1) {
             while (is_alnum(s->ch) == 1) {
                 advance(s);
             }
-
-            tok->kind = TOK_SYMBOL;
-            tok->lex = s->src + s->pos;
-            tok->lex_len = s->cur - s->pos;
-            tok->line = s->line;
+            make_token(s, tok, TOK_SYMBOL);
         } else if (is_digit(s->ch) == 1) {
             while (is_digit(s->ch) == 1) {
                 advance(s);
             }
-
-            tok->kind = TOK_NUM;
-            tok->lex = s->src + s->pos;
-            tok->lex_len = s->cur - s->pos;
-            tok->line = s->line;
+            make_token(s, tok, TOK_NUM);
         } else {
 scan_error:
-            fprintf(stderr, "%s:%d unexpected characted: %c\n", s->filepath, s->line, s->ch);
+            fprintf(stderr, "%s:%d: unexpected character %c\n", s->filepath, s->line, s->ch);
             exit(1);
         }
     }
@@ -114,6 +120,12 @@ void make_scanner(struct scanner *s, char *filepath)
     s->ch = s->src[0];
 }
 
+void undo_scan(struct scanner *s)
+{
+    s->cur = s->pos;
+    s->ch = s->src[s->cur];
+}
+
 char *tok_to_str(enum token_kind kind)
 {
     switch (kind) {
@@ -121,6 +133,10 @@ char *tok_to_str(enum token_kind kind)
         return "symbol";
     case TOK_NUM:
         return "number";
+
+    case TOK_COLON:
+        return ":";
+
     case TOK_EOF:
         return "<end of file>";
     case TOK_ERR:

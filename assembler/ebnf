@@ -1,4 +1,6 @@
-program = instruction* EOF
+program = (instruction | label)* EOF
+
+label = symbol ":"
 
 instruction = halt
             | push
@@ -13,7 +15,7 @@ instruction = halt
             | cjmp
 
 halt = "halt"
-push = "push" "b"? number
+push = "push" "b"? (number | symbol)
 conv = "ct" ("w" | "b")
 add  = "add" "b"?
 sub  = "sub" "b"?
