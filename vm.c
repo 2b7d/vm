@@ -1,38 +1,13 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "vm.h"
+
 typedef uint8_t byte;
 typedef uint16_t word;
 
 enum {
     RAM_CAP = 1 << 16
-};
-
-enum vm_opcode {
-    OP_HALT = 0,
-
-    OP_PUSH,
-    OP_PUSHB,
-
-    OP_CTW,
-    OP_CTB,
-
-    OP_ADD,
-    OP_ADDB,
-    OP_SUB,
-    OP_SUBB,
-    OP_NEG,
-    OP_NEGB,
-
-    OP_EQ,
-    OP_EQB,
-    OP_LT,
-    OP_LTB,
-    OP_GT,
-    OP_GTB,
-
-    OP_JMP,
-    OP_CJMP
 };
 
 byte ram[RAM_CAP];
@@ -103,31 +78,36 @@ void dump_mem(int start, int size)
     printf("\n");
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     int halt, i, stack_start;
+    FILE *in;
+
+    argc--;
+    argv++;
+
+    if (argc < 1) {
+        fprintf(stderr, "Provide file to execute\n");
+        return 1;
+    }
+
+    in = fopen(*argv, "r");
+    if (in == NULL) {
+        perror(NULL);
+        return 1;
+    }
 
     halt = 0;
     i = 0;
 
-    ram_writeb(i, OP_PUSHB); i++;
-    ram_writeb(i, 10); i++;
+    while (fread(ram + i, 1, 1, in) == 1) {
+        i++;
+    }
 
-    ram_writeb(i, OP_PUSHB); i++;
-    ram_writeb(i, 5); i++;
-
-    ram_writeb(i, OP_ADDB); i++;
-
-    ram_writeb(i, OP_CTW); i++;
-
-    ram_writeb(i, OP_PUSH); i++;
-    ram_write(i, 80); i += 2;
-
-    ram_writeb(i, OP_ADD); i++;
-
-    ram_writeb(i, OP_CTB); i++;
-
-    ram_writeb(i, OP_HALT); i++;
+    if (ferror(in) == 1) {
+        perror("failed to read from file");
+        return 1;
+    }
 
     sp = i;
     stack_start = sp;

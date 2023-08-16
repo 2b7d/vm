@@ -1,78 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "../lib/os.h"
 
 #include "scanner.h"
-
-struct kwd_entry {
-    char *str;
-    int str_len;
-    enum token_kind tok;
-};
-
-static struct kwd_entry keywords[] = {
-    { .str = "halt",  .str_len = 4, .tok = TOK_HALT },
-
-    { .str = "push",  .str_len = 4, .tok = TOK_PUSH },
-    { .str = "pushb", .str_len = 5, .tok = TOK_PUSHB },
-
-    { .str = "ctw",   .str_len = 3, .tok = TOK_CTW },
-    { .str = "ctb",   .str_len = 3, .tok = TOK_CTB },
-
-    { .str = "add",   .str_len = 3, .tok = TOK_ADD },
-    { .str = "addb",  .str_len = 4, .tok = TOK_ADDB },
-    { .str = "sub",   .str_len = 3, .tok = TOK_SUB },
-    { .str = "subb",  .str_len = 4, .tok = TOK_SUBB },
-    { .str = "neg",   .str_len = 3, .tok = TOK_NEG },
-    { .str = "negb",  .str_len = 4, .tok = TOK_NEGB },
-
-    { .str = "eq",    .str_len = 2, .tok = TOK_EQ },
-    { .str = "eqb",   .str_len = 3, .tok = TOK_EQB },
-    { .str = "lt",    .str_len = 2, .tok = TOK_LT },
-    { .str = "ltb",   .str_len = 3, .tok = TOK_LTB },
-    { .str = "gt",    .str_len = 2, .tok = TOK_GT },
-    { .str = "gtb",   .str_len = 3, .tok = TOK_GTB },
-
-    { .str = "jmp",   .str_len = 3, .tok = TOK_JMP },
-    { .str = "cjmp",  .str_len = 4, .tok = TOK_CJMP },
-
-    { .str = "",      .str_len = 0, .tok = TOK_ERR } // art: end of array
-};
-
-static enum token_kind lookupKeyword(struct scanner *s)
-{
-    char *ident;
-    int len;
-
-    ident = s->src + s->pos;
-    len = s->cur - s->pos;
-
-    for (struct kwd_entry *kwd = keywords; kwd->tok != TOK_ERR; ++kwd) {
-        if (len == kwd->str_len && memcmp(ident, kwd->str, len) == 0) {
-            return kwd->tok;
-        }
-    }
-
-    return TOK_IDENT;
-}
-
-void make_scanner(struct scanner *s, char *filepath)
-{
-    s->src_len = read_file(filepath, &s->src);
-    if (s->src_len < 0) {
-        perror(NULL);
-        exit(1);
-    }
-
-    s->filepath = filepath;
-    s->cur = 0;
-    s->pos = 0;
-    s->line = 1;
-
-    s->ch = s->src[0];
-}
 
 static void advance(struct scanner *s)
 {
@@ -90,23 +23,6 @@ static int next(struct scanner *s, char ch)
 
     next = s->cur + 1;
     return next < s->src_len && s->src[next] == ch;
-}
-
-static char *get_lexeme(struct scanner *s)
-{
-    int len;
-    char *lex;
-
-    len = s->cur - s->pos;
-    lex = malloc(len + 1);
-    if (lex == NULL) {
-        perror("get_lexeme");
-        exit(1);
-    }
-    memcpy(lex, s->src + s->pos, len);
-    lex[len] = '\0';
-
-    return lex;
 }
 
 static int is_digit(char ch)
@@ -129,6 +45,7 @@ void scan_token(struct scanner *s, struct token *tok)
 scan_again:
     if (s->ch == '\0') {
         tok->kind = TOK_EOF;
+        tok->line = s->line;
         return;
     }
 
@@ -160,21 +77,55 @@ scan_again:
                 advance(s);
             }
 
-            tok->kind = lookupKeyword(s);
-            if (tok->kind == TOK_IDENT) {
-                tok->lex = get_lexeme(s);
-            }
+            tok->kind = TOK_SYMBOL;
+            tok->lex = s->src + s->pos;
+            tok->lex_len = s->cur - s->pos;
+            tok->line = s->line;
         } else if (is_digit(s->ch) == 1) {
             while (is_digit(s->ch) == 1) {
                 advance(s);
             }
 
             tok->kind = TOK_NUM;
-            tok->lex = get_lexeme(s);
+            tok->lex = s->src + s->pos;
+            tok->lex_len = s->cur - s->pos;
+            tok->line = s->line;
         } else {
 scan_error:
             fprintf(stderr, "%s:%d unexpected characted: %c\n", s->filepath, s->line, s->ch);
             exit(1);
         }
+    }
+}
+
+void make_scanner(struct scanner *s, char *filepath)
+{
+    s->src_len = read_file(filepath, &s->src);
+    if (s->src_len < 0) {
+        perror(NULL);
+        exit(1);
+    }
+
+    s->filepath = filepath;
+    s->cur = 0;
+    s->pos = 0;
+    s->line = 1;
+
+    s->ch = s->src[0];
+}
+
+char *tok_to_str(enum token_kind kind)
+{
+    switch (kind) {
+    case TOK_SYMBOL:
+        return "symbol";
+    case TOK_NUM:
+        return "number";
+    case TOK_EOF:
+        return "<end of file>";
+    case TOK_ERR:
+        return "<error>";
+    default:
+        assert(0 && "unreachable");
     }
 }

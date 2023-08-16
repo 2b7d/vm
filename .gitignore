@@ -1,2 +1,4 @@
-__old
 vm
+asm
+out.vm
+test.asm

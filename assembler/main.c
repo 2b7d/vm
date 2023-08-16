@@ -1,10 +1,14 @@
 #include <stdio.h>
 
 #include "scanner.h"
+#include "../vm.h"
+#include "parser.h"
 
 int main(int argc, char **argv)
 {
-    struct scanner s;
+    struct parser p;
+    struct inst inst;
+    FILE *out;
 
     argc--;
     argv++;
@@ -14,26 +18,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    make_scanner(&s, *argv);
+    out = fopen("out.vm", "w");
+    if (out == NULL) {
+        perror(NULL);
+        return 1;
+    }
 
-    for (;;) {
-        struct token t;
+    make_parser(&p, *argv);
 
-        t.kind = TOK_ERR;
-        t.lex = NULL;
-
-        scan_token(&s, &t);
-
-        printf("token: %d", t.kind);
-        if (t.lex != NULL) {
-            printf(" %s", t.lex);
-        }
-        printf("\n");
-
-        if (t.kind == TOK_EOF) {
-            break;
+    while (parse_instruction(&p, &inst) == 1) {
+        fwrite(&inst.opcode, 1, 1, out);
+        if (inst.opcode == OP_PUSH || inst.opcode == OP_PUSHB) {
+            fwrite(&inst.operand, inst.operand_size, 1, out);
         }
     }
+
+    fclose(out);
 
     return 0;
 }

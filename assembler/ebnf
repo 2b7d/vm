@@ -1,0 +1,31 @@
+program = instruction* EOF
+
+instruction = halt
+            | push
+            | conv
+            | add
+            | sub
+            | neg
+            | eq
+            | lt
+            | gt
+            | jmp
+            | cjmp
+
+halt = "halt"
+push = "push" "b"? number
+conv = "ct" ("w" | "b")
+add  = "add" "b"?
+sub  = "sub" "b"?
+neg  = "neg" "b"?
+eq   = "eq" "b"?
+lt   = "lt" "b"?
+gt   = "gt" "b"?
+jmp  = "jmp"
+cjmp = "cjmp"
+
+number = digit+
+symbol = char (char | digit)*
+
+char  = "a" .. "z" | "A" .. "Z" | "_"
+digit = "0" .. "9"
