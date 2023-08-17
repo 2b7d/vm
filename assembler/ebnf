@@ -1,6 +1,6 @@
 program = (instruction | label)* EOF
 
-label = symbol ":"
+label = symbol ":" instruction*
 
 instruction = halt
             | push

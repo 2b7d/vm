@@ -3,13 +3,28 @@
 
 struct parser {
     struct scanner s;
-    struct token tok;
+    struct token_array ta;
+    struct token *tok;
+    int cur;
+    int offset;
 };
 
 struct inst {
     enum vm_opcode opcode;
-    int operand;
+
+    union {
+        int as_int;
+        struct token *as_tok;
+    } operand;
+    int is_resolved;
     int operand_size;
+};
+
+struct inst_array {
+    int len;
+    int cap;
+    int data_size;
+    struct inst *buf;
 };
 
 struct symbol {
@@ -25,6 +40,6 @@ struct symtable {
     struct symbol *buf;
 };
 
-int parse_instruction(struct parser *p, struct symtable *st, struct inst *inst);
-void populate_symbols(struct parser *p, struct symtable *st);
+void parse_instructions(struct parser *p, struct symtable *st, struct inst_array *ia);
+void resolve_labels(struct parser *p, struct symtable *st, struct inst_array *ia);
 void make_parser(struct parser *p, char *filepath);

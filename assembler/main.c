@@ -9,9 +9,8 @@
 int main(int argc, char **argv)
 {
     struct parser p;
-    struct inst inst;
+    struct inst_array ia;
     struct symtable st;
-
     FILE *out;
 
     argc--;
@@ -22,6 +21,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // TODO(art): take name from input file?
     out = fopen("out.vm", "w");
     if (out == NULL) {
         perror(NULL);
@@ -30,13 +30,18 @@ int main(int argc, char **argv)
 
     make_parser(&p, *argv);
     meminit(&st, sizeof(struct symbol), 128);
+    meminit(&ia, sizeof(struct inst), 256);
 
-    populate_symbols(&p, &st);
+    parse_instructions(&p, &st, &ia);
+    resolve_labels(&p, &st, &ia);
 
-    while (parse_instruction(&p, &st, &inst) == 1) {
-        fwrite(&inst.opcode, 1, 1, out);
-        if (inst.opcode == OP_PUSH || inst.opcode == OP_PUSHB) {
-            fwrite(&inst.operand, inst.operand_size, 1, out);
+    for (int i = 0; i < ia.len; ++i) {
+        struct inst *inst;
+
+        inst = ia.buf + i;
+        fwrite(&inst->opcode, 1, 1, out);
+        if (inst->opcode == OP_PUSH || inst->opcode == OP_PUSHB) {
+            fwrite(&inst->operand.as_int, inst->operand_size, 1, out);
         }
     }
 

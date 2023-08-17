@@ -28,7 +28,13 @@ struct token {
     int line;
 };
 
-char *tok_to_str(enum token_kind kind);
+struct token_array {
+    int len;
+    int cap;
+    int data_size;
+    struct token *buf;
+};
+
 void make_scanner(struct scanner *s, char *filepath);
-void scan_token(struct scanner *s, struct token *tok);
-void undo_scan(struct scanner *s);
+void scan_tokens(struct scanner *s, struct token_array *ta);
+char *tok_to_str(enum token_kind kind);

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "../lib/mem.h"
 #include "../lib/os.h"
 
 #include "scanner.h"
@@ -49,7 +50,7 @@ static int is_alnum(char ch)
     return is_char(ch) == 1 || is_digit(ch) == 1;
 }
 
-void scan_token(struct scanner *s, struct token *tok)
+static void scan(struct scanner *s, struct token *tok)
 {
 scan_again:
     if (s->ch == '\0') {
@@ -104,6 +105,20 @@ scan_error:
     }
 }
 
+void scan_tokens(struct scanner *s, struct token_array *ta)
+{
+    struct token *t;
+
+    for (;;) {
+        t = memnext(ta);
+        scan(s, t);
+
+        if (t->kind == TOK_EOF) {
+            return;
+        }
+    }
+}
+
 void make_scanner(struct scanner *s, char *filepath)
 {
     s->src_len = read_file(filepath, &s->src);
@@ -118,12 +133,6 @@ void make_scanner(struct scanner *s, char *filepath)
     s->line = 1;
 
     s->ch = s->src[0];
-}
-
-void undo_scan(struct scanner *s)
-{
-    s->cur = s->pos;
-    s->ch = s->src[s->cur];
 }
 
 char *tok_to_str(enum token_kind kind)
