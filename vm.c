@@ -7,66 +7,68 @@ typedef uint8_t byte;
 typedef uint16_t word;
 
 enum {
+    ROM_CAP = 1 << 16,
     RAM_CAP = 1 << 16
 };
 
+byte rom[ROM_CAP];
 byte ram[RAM_CAP];
 word ip;
 word sp;
 
-byte ram_readb(word addr)
+byte mem_readb(byte *mem, word addr)
 {
-    return ram[addr];
+    return mem[addr];
 }
 
-void ram_writeb(word addr, byte val)
+void mem_writeb(byte *mem, word addr, byte val)
 {
-    ram[addr] = val;
+    mem[addr] = val;
 }
 
-word ram_read(word addr)
+word mem_read(byte *mem, word addr)
 {
     byte lsb, msb;
 
-    lsb = ram_readb(addr);
-    msb = ram_readb(addr + 1);
+    lsb = mem_readb(mem, addr);
+    msb = mem_readb(mem, addr + 1);
 
     return (msb << 8) | lsb;
 }
 
-void ram_write(word addr, word val)
+void mem_write(byte *mem, word addr, word val)
 {
     byte lsb, msb;
 
     lsb = val;
     msb = val >> 8;
 
-    ram[addr] = lsb;
-    ram[addr + 1] = msb;
+    mem[addr] = lsb;
+    mem[addr + 1] = msb;
 }
 
 void pushb(byte val)
 {
-    ram_writeb(sp, val);
+    mem_writeb(ram, sp, val);
     sp++;
 }
 
 byte popb()
 {
     sp--;
-    return ram_readb(sp);
+    return mem_readb(ram, sp);
 }
 
 void push(word val)
 {
-    ram_write(sp, val);
+    mem_write(ram, sp, val);
     sp += 2;
 }
 
 word pop()
 {
     sp -= 2;
-    return ram_read(sp);
+    return mem_read(ram, sp);
 }
 
 void dump_mem(int start, int size)
@@ -80,7 +82,7 @@ void dump_mem(int start, int size)
 
 int main(int argc, char **argv)
 {
-    int halt, i, stack_start;
+    int halt, stack_start, nsecs;
     FILE *in;
 
     argc--;
@@ -97,11 +99,26 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    halt = 0;
-    i = 0;
+    fread(&ip, 2, 1, in);
+    fread(&nsecs, 2, 1, in);
 
-    while (fread(ram + i, 1, 1, in) == 1) {
-        i++;
+    while (nsecs > 0) {
+        int kind, size;
+
+        fread(&kind, 1, 1, in);
+        fread(&size, 2, 1, in);
+
+        if (kind == 0) {
+            fread(ram, 1, size, in);
+            sp = size;
+        } else if (kind == 1) {
+            fread(rom, 1, size, in);
+        } else {
+            fprintf(stderr, "unknown segment kind %d\n", kind);
+            return 1;
+        }
+
+        nsecs--;
     }
 
     if (ferror(in) == 1) {
@@ -109,7 +126,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    sp = i;
+    halt = 0;
     stack_start = sp;
 
     dump_mem(stack_start, sp - stack_start);
@@ -119,7 +136,7 @@ int main(int argc, char **argv)
         byte b1, b2;
         word w1, w2;
 
-        op = ram_readb(ip++);
+        op = mem_readb(rom, ip++);
 
         switch (op) {
         case OP_HALT:
@@ -127,12 +144,12 @@ int main(int argc, char **argv)
             break;
 
         case OP_PUSH:
-            w1 = ram_read(ip);
+            w1 = mem_read(rom, ip);
             ip += 2;
             push(w1);
             break;
         case OP_PUSHB:
-            b1 = ram_readb(ip++);
+            b1 = mem_readb(rom, ip++);
             pushb(b1);
             break;
 
