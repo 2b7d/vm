@@ -87,10 +87,11 @@ int main(int argc, char **argv)
         switch (pv->kind) {
         case PARSVAL_DATA_LABEL:
             dl = pv->value;
+            old_len = data.code.len;
             data.code.len += dl->value_size * dl->values.len;
             memgrow(&data.code);
             for (int i = 0; i < dl->values.len; ++i) {
-                memcpy(data.code.buf + i * dl->value_size,
+                memcpy(data.code.buf + old_len + i * dl->value_size,
                        dl->values.buf + i, dl->value_size);
             }
             break;
