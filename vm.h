@@ -4,6 +4,11 @@ enum vm_opcode {
     OP_PUSH,
     OP_PUSHB,
 
+    OP_LD,
+    OP_LDB,
+    OP_ST,
+    OP_STB,
+
     OP_CTW,
     OP_CTB,
 

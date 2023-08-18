@@ -157,6 +157,27 @@ int main(int argc, char **argv)
             pushb(b1);
             break;
 
+        case OP_LD:
+            w1 = pop();
+            w2 = mem_read(ram, w1);
+            push(w2);
+            break;
+        case OP_LDB:
+            w1 = pop();
+            b1 = mem_readb(ram, w1);
+            pushb(b1);
+            break;
+        case OP_ST:
+            w1 = pop();
+            w2 = pop();
+            mem_write(ram, w1, w2);
+            break;
+        case OP_STB:
+            w1 = pop();
+            b1 = popb();
+            mem_writeb(ram, w1, b1);
+            break;
+
         case OP_CTW:
             w1 = popb();
             push(w1);
