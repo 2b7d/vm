@@ -1,21 +1,25 @@
-program = (instruction | label)* EOF
+program = data_section? text_section? EOF
 
-label = symbol ":" instruction*
+text_section = "section" "text" text_label*
+text_label = symbol ":" mnemonic*
 
-instruction = halt
-            | push
-            | conv
-            | add
-            | sub
-            | neg
-            | eq
-            | lt
-            | gt
-            | jmp
-            | cjmp
+data_section = "section" "data" data_label*
+data_label = symbol ":" ("." "byte")? (number | string) ("," (number | string))*
+
+mnemonic = halt
+         | push
+         | conv
+         | add
+         | sub
+         | neg
+         | eq
+         | lt
+         | gt
+         | jmp
+         | cjmp
 
 halt = "halt"
-push = "push" "b"? (number | symbol)
+push = "push" "b"? (number | symbol | string)
 conv = "ct" ("w" | "b")
 add  = "add" "b"?
 sub  = "sub" "b"?
@@ -28,6 +32,7 @@ cjmp = "cjmp"
 
 number = digit+
 symbol = char (char | digit)*
+string = "<any char except ">+"
 
 char  = "a" .. "z" | "A" .. "Z" | "_"
 digit = "0" .. "9"

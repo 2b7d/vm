@@ -3,34 +3,16 @@
 
 struct parser {
     struct scanner s;
-    struct token_array ta;
+    struct tokens toks;
     struct token *tok;
     int cur;
-    int offset;
-};
-
-struct inst {
-    enum vm_opcode opcode;
-
-    union {
-        int as_int;
-        struct token *as_tok;
-    } operand;
-    int is_resolved;
-    int operand_size;
-};
-
-struct inst_array {
-    int len;
-    int cap;
-    int data_size;
-    struct inst *buf;
 };
 
 struct symbol {
     char *label;
     int label_len;
-    int value;
+    int addr;
+    int is_resolved;
 };
 
 struct symtable {
@@ -40,6 +22,49 @@ struct symtable {
     struct symbol *buf;
 };
 
-void parse_instructions(struct parser *p, struct symtable *st, struct inst_array *ia);
-void resolve_labels(struct parser *p, struct symtable *st, struct inst_array *ia);
+struct push_operand {
+    enum { PUSH_NUM, PUSH_SYM } kind;
+    int size;
+    union {
+        int num;
+        struct symbol *sym;
+    } as;
+};
+
+struct mnemonic_push {
+    enum vm_opcode opcode;
+    struct push_operand operand;
+};
+
+struct mnemonic {
+    enum vm_opcode opcode;
+};
+
+struct data_label {
+    int value_size;
+    struct {
+        int len;
+        int cap;
+        int data_size;
+        int *buf;
+    } values;
+};
+
+struct parsed_value {
+    enum {
+        PARSVAL_MNEMONIC,
+        PARSVAL_MNEMONIC_PUSH,
+        PARSVAL_DATA_LABEL
+    } kind;
+    void *value;
+};
+
+struct parsed_values {
+    int len;
+    int cap;
+    int data_size;
+    struct parsed_value *buf;
+};
+
+void parse(struct parser *p, struct symtable *st, struct parsed_values *values);
 void make_parser(struct parser *p, char *filepath);

@@ -8,6 +8,53 @@
 
 #include "scanner.h"
 
+struct kwd_entry {
+    char *str;
+    int str_len;
+    enum token_kind tok;
+};
+
+static struct kwd_entry keywords[] = {
+    { .str = "halt",  .str_len = 4, .tok = TOK_HALT },
+    { .str = "push",  .str_len = 4, .tok = TOK_PUSH },
+    { .str = "pushb", .str_len = 5, .tok = TOK_PUSHB },
+    { .str = "ctw",   .str_len = 3, .tok = TOK_CTW },
+    { .str = "ctb",   .str_len = 3, .tok = TOK_CTB },
+    { .str = "add",   .str_len = 3, .tok = TOK_ADD },
+    { .str = "addb",  .str_len = 4, .tok = TOK_ADDB },
+    { .str = "sub",   .str_len = 3, .tok = TOK_SUB },
+    { .str = "subb",  .str_len = 4, .tok = TOK_SUBB },
+    { .str = "neg",   .str_len = 3, .tok = TOK_NEG },
+    { .str = "negb",  .str_len = 4, .tok = TOK_NEGB },
+    { .str = "eq",    .str_len = 2, .tok = TOK_EQ },
+    { .str = "eqb",   .str_len = 3, .tok = TOK_EQB },
+    { .str = "lt",    .str_len = 2, .tok = TOK_LT },
+    { .str = "ltb",   .str_len = 3, .tok = TOK_LTB },
+    { .str = "gt",    .str_len = 2, .tok = TOK_GT },
+    { .str = "gtb",   .str_len = 3, .tok = TOK_GTB },
+    { .str = "jmp",   .str_len = 3, .tok = TOK_JMP },
+    { .str = "cjmp",  .str_len = 4, .tok = TOK_CJMP },
+
+    { .str = "byte", .str_len = 4, .tok = TOK_BYTE },
+
+    { .str = "section",    .str_len = 7, .tok = TOK_SECTION },
+    { .str = "data",    .str_len = 4, .tok = TOK_DATA },
+    { .str = "text",    .str_len = 4, .tok = TOK_TEXT },
+
+    { .str = NULL, .str_len = 0, .tok = 0 } // art: end of array
+};
+
+static enum token_kind lookup_keyword(char *sym, int sym_len)
+{
+    for (struct kwd_entry *e = keywords; e->str != NULL; ++e) {
+        if (e->str_len == sym_len && memcmp(e->str, sym, sym_len) == 0) {
+            return e->tok;
+        }
+    }
+
+    return TOK_SYM;
+}
+
 static void advance(struct scanner *s)
 {
     if (s->ch == '\0') {
@@ -81,8 +128,31 @@ scan_again:
         }
         goto scan_error;
 
+    case '.':
+        advance(s);
+        make_token(s, tok, TOK_DOT);
+        break;
+    case ',':
+        advance(s);
+        make_token(s, tok, TOK_COMMA);
+        break;
     case ':':
+        advance(s);
         make_token(s, tok, TOK_COLON);
+        break;
+
+    case '"':
+        advance(s);
+        while (s->ch != '"' && s->ch != '\0') {
+            advance(s);
+        }
+        if (s->ch == '\0') {
+            fprintf(stderr, "%s:%d: unterminated string\n", s->filepath, s->line);
+            exit(1);
+        }
+        make_token(s, tok, TOK_STR);
+        tok->lex++;
+        tok->lex_len--;
         advance(s);
         break;
 
@@ -91,7 +161,8 @@ scan_again:
             while (is_alnum(s->ch) == 1) {
                 advance(s);
             }
-            make_token(s, tok, TOK_SYMBOL);
+            make_token(s, tok, TOK_ERR);
+            tok->kind = lookup_keyword(tok->lex, tok->lex_len);
         } else if (is_digit(s->ch) == 1) {
             while (is_digit(s->ch) == 1) {
                 advance(s);
@@ -105,12 +176,12 @@ scan_error:
     }
 }
 
-void scan_tokens(struct scanner *s, struct token_array *ta)
+void scan_tokens(struct scanner *s, struct tokens *toks)
 {
     struct token *t;
 
     for (;;) {
-        t = memnext(ta);
+        t = memnext(toks);
         scan(s, t);
 
         if (t->kind == TOK_EOF) {
@@ -138,19 +209,80 @@ void make_scanner(struct scanner *s, char *filepath)
 char *tok_to_str(enum token_kind kind)
 {
     switch (kind) {
-    case TOK_SYMBOL:
-        return "symbol";
-    case TOK_NUM:
-        return "number";
+    case TOK_ERR:
+		return "<error>";
 
+    case TOK_SYM:
+		return "symbol";
+    case TOK_NUM:
+		return "number";
+    case TOK_STR:
+		return "string";
+
+    case TOK_DOT:
+		return ".";
+    case TOK_COMMA:
+		return ",";
     case TOK_COLON:
-        return ":";
+		return ":";
+
+    case TOK_SECTION:
+		return "section";
+    case TOK_DATA:
+		return "data";
+    case TOK_TEXT:
+		return "text";
+
+    case TOK_HALT:
+		return "halt";
+    case TOK_PUSH:
+		return "push";
+    case TOK_PUSHB:
+		return "pushb";
+    case TOK_CTW:
+		return "ctw";
+    case TOK_CTB:
+		return "ctb";
+    case TOK_ADD:
+		return "add";
+    case TOK_ADDB:
+		return "addb";
+    case TOK_SUB:
+		return "sub";
+    case TOK_SUBB:
+		return "subb";
+    case TOK_NEG:
+		return "neg";
+    case TOK_NEGB:
+		return "negb";
+    case TOK_EQ:
+		return "eq";
+    case TOK_EQB:
+		return "eqb";
+    case TOK_LT:
+		return "lt";
+    case TOK_LTB:
+		return "ltb";
+    case TOK_GT:
+		return "gt";
+    case TOK_GTB:
+		return "gtb";
+    case TOK_JMP:
+		return "jmp";
+    case TOK_CJMP:
+		return "cjmp";
+
+    case TOK_BYTE:
+		return "byte";
 
     case TOK_EOF:
-        return "<end of file>";
-    case TOK_ERR:
-        return "<error>";
+		return "<end of file>";
     default:
         assert(0 && "unreachable");
     }
+}
+
+int is_mnemonic(enum token_kind kind)
+{
+    return kind > TOK_mnemonic_start && kind < TOK_mnemonic_end;
 }

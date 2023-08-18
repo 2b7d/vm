@@ -1,21 +1,14 @@
-// this is comment
+section data
+_0: .byte 0
+_1: .byte 1
+_2: .byte 2
 
-pushb 7
-pushb 10
-gtb
-push do_add
-cjmp
-
-pushb 6
-pushb 4
-subb
-push exit
-jmp
-
-do_add:
-    pushb 4
-    pushb 6
+section text
+_start:
+    push _1
+    ctb
+    push _2
+    ctb
     addb
-
-exit:
-    halt // comment
+    ctw
+    halt
