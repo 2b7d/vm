@@ -71,7 +71,7 @@ word pop()
     return mem_read(ram, sp);
 }
 
-void dump_mem(int start, int size)
+void dump_ram(int start, int size)
 {
     printf("Stack: ");
     for (int i = start; i < start + size; ++i) {
@@ -103,17 +103,21 @@ int main(int argc, char **argv)
     fread(&nsecs, 2, 1, in);
 
     while (nsecs > 0) {
-        int kind, size;
+        enum vm_segment kind;
+        int size;
 
         fread(&kind, 1, 1, in);
         fread(&size, 2, 1, in);
 
-        if (kind == 0) {
+        switch (kind) {
+        case SEGMENT_DATA:
             fread(ram, 1, size, in);
             sp = size;
-        } else if (kind == 1) {
+            break;
+        case SEGMENT_TEXT:
             fread(rom, 1, size, in);
-        } else {
+            break;
+        default:
             fprintf(stderr, "unknown segment kind %d\n", kind);
             return 1;
         }
@@ -129,7 +133,7 @@ int main(int argc, char **argv)
     halt = 0;
     stack_start = sp;
 
-    dump_mem(stack_start, sp - stack_start);
+    dump_ram(stack_start, sp - stack_start);
 
     while (halt == 0) {
         enum vm_opcode op;
@@ -238,7 +242,7 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        dump_mem(stack_start, sp - stack_start);
+        dump_ram(stack_start, sp - stack_start);
     }
 
     return 0;

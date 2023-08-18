@@ -9,7 +9,7 @@
 #include "parser.h"
 
 struct segment {
-    enum { SEGMENT_DATA, SEGMENT_TEXT } kind;
+    enum vm_segment kind;
     struct {
         int len;
         int cap;
@@ -128,6 +128,7 @@ int main(int argc, char **argv)
         }
     }
 
+    nsecs = 0;
     if (data.code.len > 0) {
         nsecs++;
     }
@@ -136,13 +137,18 @@ int main(int argc, char **argv)
     }
 
     fwrite(&nsecs, 2, 1, out);
-    fwrite(&data.kind, 1, 1, out);
-    fwrite(&data.code.len, 2, 1, out);
-    fwrite(data.code.buf, 1, data.code.len, out);
 
-    fwrite(&text.kind, 1, 1, out);
-    fwrite(&text.code.len, 2, 1, out);
-    fwrite(text.code.buf, 1, text.code.len, out);
+    if (data.code.len > 0) {
+        fwrite(&data.kind, 1, 1, out);
+        fwrite(&data.code.len, 2, 1, out);
+        fwrite(data.code.buf, 1, data.code.len, out);
+    }
+
+    if (text.code.len > 0) {
+        fwrite(&text.kind, 1, 1, out);
+        fwrite(&text.code.len, 2, 1, out);
+        fwrite(text.code.buf, 1, text.code.len, out);
+    }
 
     fclose(out);
     return 0;

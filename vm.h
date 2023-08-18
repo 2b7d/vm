@@ -25,3 +25,7 @@ enum vm_opcode {
     OP_CJMP
 };
 
+enum vm_segment {
+    SEGMENT_DATA = 0,
+    SEGMENT_TEXT
+};
