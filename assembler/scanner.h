@@ -49,6 +49,7 @@ enum token_kind {
     TOK_GTB,
     TOK_JMP,
     TOK_CJMP,
+    TOK_SYSCALL,
     TOK_mnemonic_end,
 
     TOK_BYTE,

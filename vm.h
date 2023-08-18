@@ -27,7 +27,14 @@ enum vm_opcode {
     OP_GTB,
 
     OP_JMP,
-    OP_CJMP
+    OP_CJMP,
+
+    OP_SYSCALL // 1 - write
+};
+
+enum vm_syscall {
+    SYS_READ = 0,
+    SYS_WRITE
 };
 
 enum vm_segment {

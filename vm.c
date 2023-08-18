@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
+#include <unistd.h>
 
 #include "vm.h"
 
@@ -133,10 +135,11 @@ int main(int argc, char **argv)
     halt = 0;
     stack_start = sp;
 
-    dump_ram(stack_start, sp - stack_start);
+    //dump_ram(stack_start, sp - stack_start);
 
     while (halt == 0) {
         enum vm_opcode op;
+        enum vm_syscall syscall;
         byte b1, b2;
         word w1, w2;
 
@@ -213,7 +216,8 @@ int main(int argc, char **argv)
             break;
         case OP_NEGB:
             b1 = popb();
-            pushb(-b1);
+            b1 = -1 * b1;
+            pushb(b1);
             break;
 
         case OP_EQ:
@@ -258,12 +262,25 @@ int main(int argc, char **argv)
             }
             break;
 
+        case OP_SYSCALL:
+            syscall = pop();
+            switch (syscall) {
+            case SYS_WRITE: {
+                word count = pop();
+                word buf = pop();
+                word fd = pop();
+                write(fd, ram + buf, count);
+            } break;
+            default:
+                assert(0 && "unreachable");
+            }
+            break;
         default:
             fprintf(stderr, "unknown opcode %d\n", op);
             return 1;
         }
 
-        dump_ram(stack_start, sp - stack_start);
+        //dump_ram(stack_start, sp - stack_start);
     }
 
     return 0;
