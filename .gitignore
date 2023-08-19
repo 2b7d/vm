@@ -1,4 +1,5 @@
 vm
 asm
-out.vm
-test.asm
+preproc
+*.vm
+*.i

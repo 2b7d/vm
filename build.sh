@@ -19,6 +19,11 @@ if [[ $1 = "asm" ]]; then
     outname=asm
 fi
 
+if [[ $1 = "preproc" ]]; then
+    files="preproc.c lib/os.c lib/mem.c"
+    outname=preproc
+fi
+
 if [[ $2 = "prod" ]]; then
     flags=${flags/-g/-O2}
 fi
