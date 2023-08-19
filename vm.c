@@ -135,8 +135,8 @@ int main(int argc, char **argv)
 
         switch (kind) {
         case SECTION_DATA:
-            fread(ram, 1, size, in);
-            mem_write(ram, SP, size);
+            fread(ram+6, 1, size, in); // TODO(art): magic offset
+            mem_write(ram, SP, size+6); // TODO(art): magic offset
             break;
         case SECTION_TEXT:
             fread(rom, 1, size, in);
