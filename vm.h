@@ -3,6 +3,8 @@ enum vm_opcode {
 
     OP_PUSH,
     OP_PUSHB,
+    OP_DROP,
+    OP_DROPB,
 
     OP_LD,
     OP_LDB,

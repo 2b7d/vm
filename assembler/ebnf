@@ -5,6 +5,7 @@ text_label = symbol ":" mnemonic*
 
 mnemonic = "halt"
          | "push" "b"? (number|symbol|special|string)
+         | "drop" "b"?
          | "ld" "b"?
          | "st" "b"?
          | "ct" ("w"|"b")

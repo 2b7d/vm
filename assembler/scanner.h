@@ -25,6 +25,8 @@ enum token_kind {
     TOK_HALT,
     TOK_PUSH,
     TOK_PUSHB,
+    TOK_DROP,
+    TOK_DROPB,
     TOK_LD,
     TOK_LDB,
     TOK_ST,

@@ -18,6 +18,8 @@ static struct kwd_entry keywords[] = {
     { .str = "halt",    .str_len = 4, .tok = TOK_HALT },
     { .str = "push",    .str_len = 4, .tok = TOK_PUSH },
     { .str = "pushb",   .str_len = 5, .tok = TOK_PUSHB },
+    { .str = "drop",    .str_len = 4, .tok = TOK_DROP },
+    { .str = "dropb",   .str_len = 5, .tok = TOK_DROPB },
     { .str = "ld",      .str_len = 2, .tok = TOK_LD },
     { .str = "ldb",     .str_len = 3, .tok = TOK_LDB },
     { .str = "st",      .str_len = 2, .tok = TOK_ST },
@@ -236,6 +238,10 @@ char *tok_to_str(enum token_kind kind)
 		return "push";
     case TOK_PUSHB:
 		return "pushb";
+    case TOK_DROP:
+		return "drop";
+    case TOK_DROPB:
+		return "dropb";
     case TOK_LD:
 		return "ld";
     case TOK_LDB:

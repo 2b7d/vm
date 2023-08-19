@@ -53,6 +53,8 @@ static struct op_entry opcodes[] = {
     { .tok = TOK_HALT,    .op = OP_HALT },
     { .tok = TOK_PUSH,    .op = OP_PUSH },
     { .tok = TOK_PUSHB,   .op = OP_PUSHB },
+    { .tok = TOK_DROP,    .op = OP_DROP },
+    { .tok = TOK_DROPB,   .op = OP_DROPB },
     { .tok = TOK_LD,      .op = OP_LD },
     { .tok = TOK_LDB,     .op = OP_LDB },
     { .tok = TOK_ST,      .op = OP_ST },

@@ -179,6 +179,12 @@ int main(int argc, char **argv)
             b1 = mem_readb(rom, ip++);
             pushb(b1);
             break;
+        case OP_DROP:
+            pop();
+            break;
+        case OP_DROPB:
+            popb();
+            break;
 
         case OP_LD:
             w1 = pop();
