@@ -13,17 +13,13 @@ struct scanner {
 enum token_kind {
     TOK_ERR = 0,
 
-    TOK_SYM,
     TOK_NUM,
+    TOK_SYM,
     TOK_STR,
 
     TOK_DOT,
     TOK_COMMA,
     TOK_COLON,
-
-    TOK_SECTION,
-    TOK_DATA,
-    TOK_TEXT,
 
     TOK_mnemonic_start,
     TOK_HALT,
@@ -49,10 +45,13 @@ enum token_kind {
     TOK_GTB,
     TOK_JMP,
     TOK_CJMP,
+    TOK_CALL,
+    TOK_RET,
     TOK_SYSCALL,
     TOK_mnemonic_end,
 
     TOK_BYTE,
+    TOK_WORD,
 
     TOK_EOF
 };

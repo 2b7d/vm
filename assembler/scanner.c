@@ -38,13 +38,12 @@ static struct kwd_entry keywords[] = {
     { .str = "gtb",     .str_len = 3, .tok = TOK_GTB },
     { .str = "jmp",     .str_len = 3, .tok = TOK_JMP },
     { .str = "cjmp",    .str_len = 4, .tok = TOK_CJMP },
+    { .str = "call",    .str_len = 4, .tok = TOK_CALL },
+    { .str = "ret",     .str_len = 3, .tok = TOK_RET },
     { .str = "syscall", .str_len = 7, .tok = TOK_SYSCALL },
 
     { .str = "byte", .str_len = 4, .tok = TOK_BYTE },
-
-    { .str = "section",    .str_len = 7, .tok = TOK_SECTION },
-    { .str = "data",    .str_len = 4, .tok = TOK_DATA },
-    { .str = "text",    .str_len = 4, .tok = TOK_TEXT },
+    { .str = "word", .str_len = 4, .tok = TOK_WORD },
 
     { .str = NULL, .str_len = 0, .tok = 0 } // art: end of array
 };
@@ -217,10 +216,10 @@ char *tok_to_str(enum token_kind kind)
     case TOK_ERR:
 		return "<error>";
 
-    case TOK_SYM:
-		return "symbol";
     case TOK_NUM:
 		return "number";
+    case TOK_SYM:
+		return "symbol";
     case TOK_STR:
 		return "string";
 
@@ -231,19 +230,20 @@ char *tok_to_str(enum token_kind kind)
     case TOK_COLON:
 		return ":";
 
-    case TOK_SECTION:
-		return "section";
-    case TOK_DATA:
-		return "data";
-    case TOK_TEXT:
-		return "text";
-
     case TOK_HALT:
 		return "halt";
     case TOK_PUSH:
 		return "push";
     case TOK_PUSHB:
 		return "pushb";
+    case TOK_LD:
+		return "ld";
+    case TOK_LDB:
+		return "ldb";
+    case TOK_ST:
+		return "st";
+    case TOK_STB:
+		return "stb";
     case TOK_CTW:
 		return "ctw";
     case TOK_CTB:
@@ -276,12 +276,23 @@ char *tok_to_str(enum token_kind kind)
 		return "jmp";
     case TOK_CJMP:
 		return "cjmp";
+    case TOK_CALL:
+		return "call";
+    case TOK_RET:
+		return "ret";
+    case TOK_SYSCALL:
+		return "syscall";
 
     case TOK_BYTE:
 		return "byte";
+    case TOK_WORD:
+		return "word";
 
     case TOK_EOF:
 		return "<end of file>";
+
+    case TOK_mnemonic_start:
+    case TOK_mnemonic_end:
     default:
         assert(0 && "unreachable");
     }

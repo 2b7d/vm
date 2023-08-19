@@ -9,7 +9,7 @@
 #include "parser.h"
 
 struct segment {
-    enum vm_segment kind;
+    enum vm_section kind;
     struct {
         int len;
         int cap;
@@ -17,6 +17,16 @@ struct segment {
         char *buf;
     } code;
 };
+
+/*
+ * Object file for now
+ *
+ * _start addr        - 2 bytes
+ * number of sections - 1 byte
+ * section kind       - 1 byte
+ * section size       - 2 bytes
+ * code               - section size bytes
+ */
 
 int main(int argc, char **argv)
 {
@@ -69,17 +79,15 @@ int main(int argc, char **argv)
 
     fwrite(&_start_addr, 2, 1, out);
 
-    data.kind = SEGMENT_DATA;
-    text.kind = SEGMENT_TEXT;
+    data.kind = SECTION_DATA;
+    text.kind = SECTION_TEXT;
     meminit(&data.code, 1, 256);
     meminit(&text.code, 1, 256);
 
     for (int i = 0; i < values.len; ++i) {
         struct parsed_value *pv;
         struct data_label *dl;
-        struct mnemonic *m;
-        struct mnemonic_push *mp;
-        struct symbol *sym;
+        struct text_label *tl;
         int old_len;
 
         pv = values.buf + i;
@@ -95,33 +103,43 @@ int main(int argc, char **argv)
                        dl->values.buf + i, dl->value_size);
             }
             break;
-        case PARSVAL_MNEMONIC:
-            m = pv->value;
-            memgrow(&text.code);
-            text.code.buf[text.code.len++] = m->opcode;
-            break;
-        case PARSVAL_MNEMONIC_PUSH:
-            mp = pv->value;
-            old_len = text.code.len;
-            text.code.len += 1 + mp->operand.size;
-            memgrow(&text.code);
-            text.code.buf[old_len++] = mp->opcode;
+        case PARSVAL_TEXT_LABEL:
+            tl = pv->value;
+            for (int i = 0; i < tl->len; ++i) {
+                struct mnemonic *m;
+                struct symbol *sym;
 
-            switch (mp->operand.kind) {
-            case PUSH_NUM:
-                memcpy(text.code.buf + old_len, &mp->operand.as.num,
-                       mp->operand.size);
-                break;
-            case PUSH_SYM:
-                sym = mp->operand.as.sym;
-                if (sym->is_resolved == 0) {
-                    fprintf(stderr, "undefined symbol %.*s\n", sym->label_len, sym->label);
-                    return 1;
+                m = tl->buf + i;
+
+                memgrow(&text.code);
+                text.code.buf[text.code.len++] = m->opcode;
+
+                if (with_operand(m->opcode) == 0) {
+                    continue;
                 }
-                memcpy(text.code.buf + old_len, &sym->addr, mp->operand.size);
-                break;
-            default:
-                assert(0 && "unreachable");
+
+                old_len = text.code.len;
+                text.code.len += m->operand.size;
+                memgrow(&text.code);
+
+                switch (m->operand.kind) {
+                case OPERAND_NUM:
+                    memcpy(text.code.buf + old_len, &m->operand.as.num,
+                           m->operand.size);
+                    break;
+                case OPERAND_SYM:
+                    sym = m->operand.as.sym;
+                    if (sym->is_resolved == 0) {
+                        // TODO(art): add file position
+                        fprintf(stderr, "undefined symbol %.*s\n", sym->label_len, sym->label);
+                        return 1;
+                    }
+                    memcpy(text.code.buf + old_len, &sym->addr,
+                           m->operand.size);
+                    break;
+                default:
+                    assert(0 && "unreachable");
+                }
             }
             break;
         default:

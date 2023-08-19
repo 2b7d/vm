@@ -9,6 +9,41 @@
 #include "scanner.h"
 #include "parser.h"
 
+struct special_entry {
+    char *str;
+    int str_len;
+    int addr;
+};
+
+static struct special_entry specials[] = {
+    { .str = "_sp", .str_len = 3, .addr = 0 },
+    { .str = "_fp", .str_len = 3, .addr = 2 },
+    { .str = "_rp", .str_len = 3, .addr = 4 },
+
+    { .str = NULL, .str_len = 0, .addr = 0 } // art: end of array
+};
+
+static int check_special(struct token *t, int *addr)
+{
+    if (t->lex_len == 0) {
+        return 0;
+    }
+
+    if (t->lex[0] != '_') {
+        return 0;
+    }
+
+    for (struct special_entry *e = specials; e->str != NULL; ++e) {
+        if (t->lex_len == e->str_len &&
+                memcmp(t->lex, e->str, t->lex_len) == 0) {
+            *addr = e->addr;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 struct op_entry {
     enum token_kind tok;
     enum vm_opcode op;
@@ -38,6 +73,8 @@ static struct op_entry opcodes[] = {
     { .tok = TOK_GTB,     .op = OP_GTB },
     { .tok = TOK_JMP,     .op = OP_JMP },
     { .tok = TOK_CJMP,    .op = OP_CJMP },
+    { .tok = TOK_CALL,    .op = OP_CALL },
+    { .tok = TOK_RET,     .op = OP_RET },
     { .tok = TOK_SYSCALL, .op = OP_SYSCALL },
 
     { .tok = TOK_ERR, .op = 0 } // art: end of array
@@ -89,6 +126,11 @@ static struct symbol *insert_symbol(struct symtable *st, char *label,
     return s;
 }
 
+int with_operand(enum vm_opcode op)
+{
+    return op == OP_PUSH || op == OP_PUSHB || op == OP_CALL;
+}
+
 static void advance(struct parser *p)
 {
     if (p->tok->kind == TOK_EOF) {
@@ -107,6 +149,14 @@ static void consume(struct parser *p, enum token_kind kind)
     }
 
     advance(p);
+}
+
+static int next(struct parser *p, enum token_kind kind)
+{
+    int next;
+
+    next = p->cur + 1;
+    return next < p->toks.len && p->toks.buf[next].kind == kind;
 }
 
 static int parse_num(struct parser *p, int size)
@@ -133,205 +183,205 @@ static int parse_num(struct parser *p, int size)
     return atoi(buf);
 }
 
-static void parse_data(struct parser *p, struct symtable *st,
-                       struct parsed_values *values)
+static void parse_label_definition(struct parser *p, struct symtable *st,
+                                   int data_offset, int text_offset)
 {
     struct token *label;
     struct symbol *sym;
-    struct data_label *dl;
-    struct parsed_value *pv;
-    int offset, old_len;
 
-    offset = 0;
+    label = p->tok;
 
-    while (p->tok->kind != TOK_SECTION && p->tok->kind != TOK_EOF) {
-        label = p->tok;
+    consume(p, TOK_SYM);
+    consume(p, TOK_COLON);
 
-        consume(p, TOK_SYM);
-        consume(p, TOK_COLON);
-
-        sym = lookup_symbol(st, label->lex, label->lex_len);
-        if (sym == NULL) {
-            sym = memnext(st);
-            sym->label = label->lex;
-            sym->label_len = label->lex_len;
-        }
-        sym->addr = offset;
-        sym->is_resolved = 1;
-
-        dl = malloc(sizeof(struct data_label));
-        if (dl == NULL) {
-            perror("parse_data");
-            exit(1);
-        }
-
-        dl->value_size = 2;
-        meminit(&dl->values, sizeof(int), 128);
-
-        pv = memnext(values);
-        pv->kind = PARSVAL_DATA_LABEL;
-        pv->value = dl;
-
-        if (p->tok->kind == TOK_DOT) {
-            advance(p);
-            consume(p, TOK_BYTE);
-            dl->value_size = 1;
-        }
-
-        for (;;) {
-            switch (p->tok->kind) {
-            case TOK_NUM:
-                memgrow(&dl->values);
-                dl->values.buf[dl->values.len++] = parse_num(p, dl->value_size);
-                offset += dl->value_size;
-                break;
-            case TOK_STR:
-                old_len = dl->values.len;
-                dl->values.len += p->tok->lex_len;
-                memgrow(&dl->values);
-                offset += p->tok->lex_len * dl->value_size;
-                for (int i = 0; i < p->tok->lex_len; ++i) {
-                    dl->values.buf[old_len + i] = p->tok->lex[i];
-                }
-                break;
-            default:
-                fprintf(stderr, "%s:%d: expected number or string but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
-                exit(1);
-            }
-
-            advance(p);
-
-            if (p->tok->kind != TOK_COMMA) {
-                break;
-            }
-
-            advance(p);
-        }
+    sym = lookup_symbol(st, label->lex, label->lex_len);
+    if (sym == NULL) {
+        sym = memnext(st);
+        sym->label = label->lex;
+        sym->label_len = label->lex_len;
     }
+    if (p->tok->kind == TOK_DOT) {
+        sym->addr = data_offset;
+    } else {
+        sym->addr = text_offset;
+    }
+    sym->is_resolved = 1;
 }
 
-static void parse_text(struct parser *p, struct symtable *st,
-                       struct parsed_values *values)
+static int parse_data_label(struct parser *p, struct parsed_value *pv)
 {
-    struct token *label;
-    struct symbol *sym;
-    struct mnemonic *m;
-    struct mnemonic_push *mp;
-    struct parsed_value *pv;
-    enum vm_opcode opcode;
+    struct data_label *dl;
     int offset;
 
     offset = 0;
 
-    while (p->tok->kind != TOK_SECTION && p->tok->kind != TOK_EOF) {
-        label = p->tok;
+    consume(p, TOK_DOT);
 
-        consume(p, TOK_SYM);
-        consume(p, TOK_COLON);
-
-        sym = lookup_symbol(st, label->lex, label->lex_len);
-        if (sym == NULL) {
-            sym = memnext(st);
-            sym->label = label->lex;
-            sym->label_len = label->lex_len;
-        }
-        sym->addr = offset;
-        sym->is_resolved = 1;
-
-        for (;;) {
-            if (is_mnemonic(p->tok->kind) == 0) {
-                break;
-            }
-
-            pv = memnext(values);
-
-            opcode = lookup_opcode(p->tok->kind);
-            advance(p);
-            offset++;
-
-            if (opcode == OP_PUSH || opcode == OP_PUSHB) {
-                mp = malloc(sizeof(struct mnemonic_push));
-                if (mp == NULL) {
-                    perror("parse_text");
-                    exit(1);
-                }
-
-                pv->kind = PARSVAL_MNEMONIC_PUSH;
-                pv->value = mp;
-
-                mp->opcode = opcode;
-                mp->operand.size = 2;
-                if (mp->opcode == OP_PUSHB) {
-                    mp->operand.size = 1;
-                }
-
-                offset += mp->operand.size;
-
-                switch (p->tok->kind) {
-                case TOK_NUM:
-                    mp->operand.kind = PUSH_NUM;
-                    mp->operand.as.num = parse_num(p, mp->operand.size);
-                    break;
-                case TOK_SYM:
-                    if (mp->opcode == OP_PUSHB) {
-                        fprintf(stderr, "%s:%d: attempted to push symbol with pushb, use push\n", p->s.filepath, p->tok->line);
-                        exit(1);
-                    }
-                    sym = insert_symbol(st, p->tok->lex, p->tok->lex_len, 0, 0);
-                    mp->operand.kind = PUSH_SYM;
-                    mp->operand.as.sym = sym;
-                    break;
-                case TOK_STR:
-                    if (p->tok->lex_len == 0) {
-                        fprintf(stderr, "%s:%d: can not push empty string\n", p->s.filepath, p->tok->line);
-                        exit(1);
-                    }
-                    if (p->tok->lex_len > 1) {
-                        fprintf(stderr, "%s:%d: can not push more than one character\n", p->s.filepath, p->tok->line);
-                        exit(1);
-                    }
-                    mp->operand.kind = PUSH_NUM;
-                    mp->operand.as.num = p->tok->lex[0];
-                    break;
-                default:
-                    fprintf(stderr, "%s:%d: expected number, symbol or string but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
-                    exit(1);
-                }
-
-                advance(p);
-                continue;
-            }
-
-            m = malloc(sizeof(struct mnemonic));
-            if (m == NULL) {
-                perror("parse_text");
-                exit(1);
-            }
-
-            m->opcode = opcode;
-
-            pv->kind = PARSVAL_MNEMONIC;
-            pv->value = m;
-        }
+    dl = malloc(sizeof(struct data_label));
+    if (dl == NULL) {
+        perror("parse_data_label");
+        exit(1);
     }
+
+    meminit(&dl->values, sizeof(int), 64);
+
+    if (p->tok->kind == TOK_BYTE) {
+        dl->value_size = 1;
+    } else if (p->tok->kind == TOK_WORD) {
+        dl->value_size = 2;
+    } else {
+        fprintf(stderr, "%s:%d: unknown data directive %.*s\n", p->s.filepath, p->tok->line, p->tok->lex_len, p->tok->lex);
+        exit(1);
+    }
+
+    advance(p);
+
+    for (;;) {
+        if (p->tok->kind == TOK_NUM) {
+            memgrow(&dl->values);
+            dl->values.buf[dl->values.len++] = parse_num(p, dl->value_size);
+            offset += dl->value_size;
+        } else if (p->tok->kind == TOK_STR) {
+            int old_len;
+
+            old_len = dl->values.len;
+            dl->values.len += p->tok->lex_len;
+            memgrow(&dl->values);
+            offset += p->tok->lex_len * dl->value_size;
+            for (int i = 0; i < p->tok->lex_len; ++i) {
+                dl->values.buf[old_len + i] = p->tok->lex[i];
+            }
+        } else {
+            fprintf(stderr, "%s:%d: expected number or string but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
+            exit(1);
+        }
+
+        advance(p);
+
+        if (p->tok->kind != TOK_COMMA) {
+            break;
+        }
+
+        advance(p);
+    }
+
+    pv->kind = PARSVAL_DATA_LABEL;
+    pv->value = dl;
+    return offset;
+}
+
+static int parse_mnemonic(struct parser *p, struct symtable *st,
+                          struct text_label *tl)
+{
+    struct mnemonic *m;
+    int offset;
+
+    offset = 0;
+
+    m = memnext(tl);
+    m->opcode = lookup_opcode(p->tok->kind);
+
+    advance(p);
+    offset++;
+
+    if (with_operand(m->opcode) == 0) {
+        return offset;
+    }
+
+    m->operand.size = 2;
+    if (m->opcode == OP_PUSHB) {
+        m->operand.size = 1;
+    }
+
+    if (p->tok->kind == TOK_NUM) {
+        m->operand.kind = OPERAND_NUM;
+        m->operand.as.num = parse_num(p, m->operand.size);
+    } else if (p->tok->kind == TOK_SYM) {
+        if (m->opcode == OP_PUSHB) {
+            fprintf(stderr, "%s:%d: attempted to push symbol with pushb, use push\n", p->s.filepath, p->tok->line);
+            exit(1);
+        }
+        if (check_special(p->tok, &m->operand.as.num) == 1) {
+            m->operand.kind = OPERAND_NUM;
+        } else {
+            m->operand.kind = OPERAND_SYM;
+            m->operand.as.sym = insert_symbol(st, p->tok->lex, p->tok->lex_len, 0, 0);
+        }
+    } else if (p->tok->kind == TOK_STR) {
+        if (m->opcode == OP_CALL) {
+            fprintf(stderr, "%s:%d: expected symbol or number\n", p->s.filepath, p->tok->line);
+            exit(1);
+        }
+        if (p->tok->lex_len == 0) {
+            fprintf(stderr, "%s:%d: can not push empty string\n", p->s.filepath, p->tok->line);
+            exit(1);
+        }
+        if (p->tok->lex_len > 1) {
+            fprintf(stderr, "%s:%d: can not push more than one character\n", p->s.filepath, p->tok->line);
+            exit(1);
+        }
+        m->operand.kind = OPERAND_NUM;
+        m->operand.as.num = p->tok->lex[0];
+    } else {
+        fprintf(stderr, "%s:%d: expected number, symbol or string but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
+        exit(1);
+    }
+
+    advance(p);
+    offset += m->operand.size;
+    return offset;
+}
+
+static int parse_text_label(struct parser *p, struct symtable *st,
+                            struct parsed_value *pv)
+{
+    struct text_label *tl;
+    int offset;
+
+    offset = 0;
+
+    tl = malloc(sizeof(struct text_label));
+    if (tl == NULL) {
+        perror("parse_text_label");
+        exit(1);
+    }
+
+    meminit(tl, sizeof(struct mnemonic), 128);
+
+    while (is_mnemonic(p->tok->kind) == 1) {
+        offset += parse_mnemonic(p, st, tl);
+    }
+
+    if (p->tok->kind != TOK_EOF &&
+            (p->tok->kind != TOK_SYM || next(p, TOK_COLON) == 0)) {
+        fprintf(stderr, "%s:%d: unknown mnemonic %.*s\n", p->s.filepath, p->tok->line, p->tok->lex_len, p->tok->lex);
+        exit(1);
+    }
+
+    pv->kind = PARSVAL_TEXT_LABEL;
+    pv->value = tl;
+    return offset;
 }
 
 void parse(struct parser *p, struct symtable *st, struct parsed_values *values)
 {
-    while (p->tok->kind != TOK_EOF) {
-        consume(p, TOK_SECTION);
+    struct parsed_value *pv;
+    int data_offset, text_offset;
 
-        switch (p->tok->kind) {
-        case TOK_DATA:
-            advance(p);
-            parse_data(p, st, values);
-            break;
-        case TOK_TEXT:
-            advance(p);
-            parse_text(p, st, values);
-            break;
-        default:
-            fprintf(stderr, "%s:%d: expected data or text but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
+    data_offset = 6; // TODO(art): should be in config or something?
+    text_offset = 0;
+
+    while (p->tok->kind != TOK_EOF) {
+        parse_label_definition(p, st, data_offset, text_offset);
+
+        pv = memnext(values);
+
+        if (p->tok->kind == TOK_DOT) {
+            data_offset += parse_data_label(p, pv);
+        } else if (is_mnemonic(p->tok->kind) == 1) {
+            text_offset += parse_text_label(p, st, pv);
+        } else {
+            fprintf(stderr, "%s:%d: expected directive or mnemonic but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
             exit(1);
         }
     }
