@@ -29,7 +29,10 @@ enum vm_opcode {
     OP_JMP,
     OP_CJMP,
 
-    OP_SYSCALL // 1 - write
+    OP_CALL,
+    OP_RET,
+
+    OP_SYSCALL
 };
 
 enum vm_syscall {
@@ -37,7 +40,7 @@ enum vm_syscall {
     SYS_WRITE
 };
 
-enum vm_segment {
-    SEGMENT_DATA = 0,
-    SEGMENT_TEXT
+enum vm_section {
+    SECTION_DATA = 0,
+    SECTION_TEXT
 };

@@ -1,41 +1,22 @@
-section data
-msg: .byte "hello, world", 10
-msg_len: 13
-index: 0
-char: .byte 0
-
-section text
 _start:
-    push 1
-    push msg
-    push msg_len ld
-    push 1
-    syscall
-
-loop:
-    push index ld
-    push msg_len ld
-    eq
-    push done
-    cjmp
-
-    push index ld
-    push msg
-    add
-    ldb
-    push char stb
-
-    push 1
-    push char
-    push 1
-    push 1
-    syscall
-
-    push index ld
-    push 1
-    add
-    push index st
-    push loop
-    jmp
-done:
+    push 2
+    push 4
+    call sum
+    push _sp ld push 4 sub push _sp st
+    push _rp ld
     halt
+
+sum: // w1, w2 -> w
+    push _fp ld push 4 sub ld
+    call inc
+    push _sp ld push 2 sub push _sp st // art: should add drop/dropb opcode?
+    push _rp ld
+    push _fp ld push 6 sub ld
+    add
+    ret
+
+inc: // w1 -> w
+    push _fp ld push 4 sub ld
+    push 1
+    add
+    ret

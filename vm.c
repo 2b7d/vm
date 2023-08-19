@@ -10,13 +10,16 @@ typedef uint16_t word;
 
 enum {
     ROM_CAP = 1 << 16,
-    RAM_CAP = 1 << 16
+    RAM_CAP = 1 << 16,
+
+    SP = 0,
+    FP = 2,
+    RP = 4
 };
 
 byte rom[ROM_CAP];
 byte ram[RAM_CAP];
 word ip;
-word sp;
 
 byte mem_readb(byte *mem, word addr)
 {
@@ -51,26 +54,41 @@ void mem_write(byte *mem, word addr, word val)
 
 void pushb(byte val)
 {
+    word sp;
+
+    sp = mem_read(ram, SP);
     mem_writeb(ram, sp, val);
-    sp++;
+    mem_write(ram, SP, sp + 1);
 }
 
 byte popb()
 {
-    sp--;
-    return mem_readb(ram, sp);
+    word sp, val;
+
+    sp = mem_read(ram, SP) - 1;
+    val = mem_readb(ram, sp);
+    mem_write(ram, SP, sp);
+
+    return val;
 }
 
 void push(word val)
 {
+    word sp;
+
+    sp = mem_read(ram, SP);
     mem_write(ram, sp, val);
-    sp += 2;
+    mem_write(ram, SP, sp + 2);
 }
 
 word pop()
 {
-    sp -= 2;
-    return mem_read(ram, sp);
+    word sp, val;
+
+    sp = mem_read(ram, SP) - 2;
+    val = mem_read(ram, sp);
+    mem_write(ram, SP, sp);
+    return val;
 }
 
 void dump_ram(int start, int size)
@@ -101,26 +119,30 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    mem_write(ram, SP, 6);
+    mem_write(ram, FP, 0);
+    mem_write(ram, RP, 0);
+
     fread(&ip, 2, 1, in);
     fread(&nsecs, 2, 1, in);
 
     while (nsecs > 0) {
-        enum vm_segment kind;
+        enum vm_section kind;
         int size;
 
         fread(&kind, 1, 1, in);
         fread(&size, 2, 1, in);
 
         switch (kind) {
-        case SEGMENT_DATA:
+        case SECTION_DATA:
             fread(ram, 1, size, in);
-            sp = size;
+            mem_write(ram, SP, size);
             break;
-        case SEGMENT_TEXT:
+        case SECTION_TEXT:
             fread(rom, 1, size, in);
             break;
         default:
-            fprintf(stderr, "unknown segment kind %d\n", kind);
+            fprintf(stderr, "unknown section kind %d\n", kind);
             return 1;
         }
 
@@ -133,9 +155,7 @@ int main(int argc, char **argv)
     }
 
     halt = 0;
-    stack_start = sp;
-
-    //dump_ram(stack_start, sp - stack_start);
+    stack_start = mem_read(ram, SP);
 
     while (halt == 0) {
         enum vm_opcode op;
@@ -262,6 +282,25 @@ int main(int argc, char **argv)
             }
             break;
 
+        case OP_CALL:
+            w1 = mem_read(rom, ip);
+            ip += 2;
+            push(ip);
+            ip = w1;
+            w1 = mem_read(ram, FP);
+            w2 = mem_read(ram, SP);
+            mem_write(ram, FP, w2);
+            push(w1);
+            break;
+        case OP_RET:
+            w1 = pop();
+            mem_write(ram, RP, w1);
+            w1 = mem_read(ram, FP);
+            ip = mem_read(ram, w1 - 2);
+            mem_write(ram, SP, w1 - 2);
+            mem_write(ram, FP, mem_read(ram, w1));
+            break;
+
         case OP_SYSCALL:
             syscall = pop();
             switch (syscall) {
@@ -271,6 +310,7 @@ int main(int argc, char **argv)
                 word fd = pop();
                 write(fd, ram + buf, count);
             } break;
+            case SYS_READ:
             default:
                 assert(0 && "unreachable");
             }
@@ -280,7 +320,7 @@ int main(int argc, char **argv)
             return 1;
         }
 
-        //dump_ram(stack_start, sp - stack_start);
+        dump_ram(stack_start, mem_read(ram, SP) - stack_start);
     }
 
     return 0;
