@@ -1,10 +1,10 @@
 #define SYS_write 1
 #define STDOUT    1
 
-#define push_arg  (x) push _fp ld push x sub ld
-#define push_loc  (x) push _fp ld push x add ld
-#define  pop_loc  (x) push _fp ld push x add st
-#define push_ret      push _rp ld
+#define push_arg (x) push _fp ld push x sub ld
+#define push_loc (x) push _fp ld push x add ld
+#define  pop_loc (x) push _fp ld push x add st
+#define push_ret     push _rp ld
 
 msg: .byte "hello, world", 10, 0
 
