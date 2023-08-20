@@ -176,9 +176,6 @@ int main(int argc, char **argv)
         fwrite(text.code.buf, 1, text.code.len, out);
     }
 
-    printf("data %d\n", data.code.len);
-    printf("text %d\n", text.code.len);
-
     fclose(out);
     return 0;
 }

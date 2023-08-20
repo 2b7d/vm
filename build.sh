@@ -28,7 +28,7 @@ case $1 in
         outname=ppc
         ;;
     disassembler)
-        files="disassembler/main.c lib/path.c lib/mem.c"
+        files="disassembler/main.c"
         outname=diasm
         ;;
     all)
