@@ -62,5 +62,5 @@ int string_cmpc(string *s, char *cstr)
     string s2;
 
     string_fromc(&s2, cstr);
-    return string_cmp(s, s2);
+    return string_cmp(s, &s2);
 }

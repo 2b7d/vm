@@ -13,10 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lib/sstring.h"
-#include "lib/os.h"
-#include "lib/path.h"
-#include "lib/mem.h"
+#include "../lib/sstring.h"
+#include "../lib/os.h"
+#include "../lib/path.h"
+#include "../lib/mem.h"
 
 struct define {
     enum {

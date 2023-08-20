@@ -14,20 +14,20 @@ if [[ $1 = "vm" ]]; then
     outname=vm
 fi
 
-if [[ $1 = "asm" ]]; then
+if [[ $1 = "assembler" ]]; then
     files="assembler/*.c lib/os.c lib/mem.c lib/path.c lib/sstring.c"
     outname=asm
 fi
 
-if [[ $1 = "preproc" ]]; then
-    files="preproc.c lib/os.c lib/mem.c lib/path.c lib/sstring.c"
-    outname=preproc
+if [[ $1 = "preprocessor" ]]; then
+    files="preprocessor/main.c lib/os.c lib/mem.c lib/path.c lib/sstring.c"
+    outname=ppc
 fi
 
 if [[ $1 = "all" ]]; then
     ./build.sh vm $2 &
-    ./build.sh asm $2 &
-    ./build.sh preproc $2 &
+    ./build.sh assembler $2 &
+    ./build.sh preprocessor $2 &
     wait
     exit
 fi
