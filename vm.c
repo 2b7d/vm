@@ -124,7 +124,7 @@ int main(int argc, char **argv)
     mem_write(ram, RP, 0);
 
     fread(&ip, 2, 1, in);
-    fread(&nsecs, 2, 1, in);
+    fread(&nsecs, 1, 1, in);
 
     while (nsecs > 0) {
         enum vm_section kind;

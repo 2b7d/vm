@@ -28,8 +28,8 @@ case $1 in
         outname=ppc
         ;;
     disassembler)
-        files="disassembler/main.c"
-        outname=ppc
+        files="disassembler/main.c lib/path.c lib/mem.c"
+        outname=diasm
         ;;
     all)
         ./build.sh vm $2 &
