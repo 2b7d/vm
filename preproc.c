@@ -1,3 +1,14 @@
+/*
+ * define_fn    = "#" "define" ident "(" ident ("," ident)* ")" ANY LF
+ * define_const = "#" "define" ident ANY LF
+ *
+ * ident = char (digit|char)*
+ *
+ * digit = "0".."9"
+ * char  = "a".."z"|"A".."Z"|"_"
+ *
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,14 +16,47 @@
 #include "lib/os.h"
 #include "lib/mem.h"
 
+typedef struct {
+    char *ptr;
+    int len;
+} string;
+
+void make_string(string *s, char *ptr, int len)
+{
+    s->ptr = ptr;
+    s->len = len;
+}
+
+int string_cmp(string *s1, string *s2)
+{
+    if (s1->len != s2->len) {
+        return 0;
+    }
+
+    for (int i = 0; i < s1->len; ++i) {
+        if (s1->ptr[i] != s2->ptr[i]) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 struct define {
-    char *name;
-    int name_len;
-    char *value;
-    int value_len;
-    int has_args;
-    int args_len;
-    struct { char *name; int len; } args[10];
+    enum {
+        DEF_CONST = 0,
+        DEF_FN
+    } kind;
+
+    string name;
+    string value;
+
+    struct {
+        int len;
+        int cap;
+        int data_size;
+        string *buf;
+    } args;
 };
 
 struct define_array {
@@ -22,20 +66,51 @@ struct define_array {
     struct define *buf;
 };
 
-struct output {
-    int len;
-    int cap;
-    int data_size;
-    char *buf;
-};
+int is_lower(char c)
+{
+    return c >= 'a' && c <= 'z';
+}
 
-struct define *defcmp(struct define_array *defs, char *str, int str_len)
+int is_char(char c)
+{
+    return is_lower(c) == 1 || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+int is_digit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+int is_alnum(char c)
+{
+    return is_char(c) == 1 || is_digit(c) == 1;
+}
+
+int skip_space(char *ptr, int index)
+{
+    while (ptr[index] == ' ') {
+        index++;
+    }
+
+    return index;
+}
+
+int skip_until_newline(char *ptr, int index)
+{
+    while (ptr[index] != '\n' && ptr[index] != '\0') {
+        index++;
+    }
+
+    return index;
+}
+
+struct define *defcmp(struct define_array *defs, string *ident)
 {
     for (int i = 0; i < defs->len; ++i) {
         struct define *d;
 
         d = defs->buf + i;
-        if (d->name_len == str_len && memcmp(d->name, str, str_len) == 0) {
+        if (string_cmp(&d->name, ident) == 1) {
             return d;
         }
     }
@@ -43,22 +118,11 @@ struct define *defcmp(struct define_array *defs, char *str, int str_len)
     return NULL;
 }
 
-char *skip_whitespace(char *s)
-{
-    while (*s == ' ' || *s == '\t') {
-        s++;
-    }
-
-    return s;
-}
-
 int main(int argc, char **argv)
 {
     struct define_array defs;
-    struct output output;
-    struct define *def;
-    char *src, *start;
-    int len, src_len;
+    char *src, *newsrc;
+    int src_len, i, j, is_newline;
     FILE *out;
 
     argc--;
@@ -75,6 +139,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    newsrc = malloc(src_len);
+    if (newsrc == NULL) {
+        perror(NULL);
+        return 1;
+    }
+
     out = fopen("out.i", "w");
     if (out == NULL) {
         perror(NULL);
@@ -82,185 +152,234 @@ int main(int argc, char **argv)
     }
 
     meminit(&defs, sizeof(struct define), 32);
-    meminit(&output, 1, src_len + 256);
 
+    i = 0;
+    j = 0;
+    is_newline = 1;
+    while (src[i] != '\0') {
+        struct define *def;
+        int begin, end, len;
 
-define_scan:
-    switch (*src) {
-    case ' ':
-    case '\t':
-    case '\r':
-    case '\n':
-        src++;
-        goto define_scan;
-    case '#':
-        src++;
-        start = src;
-        while (*src >= 'a' && *src <= 'z') {
-            src++;
+        if (src[i] == '\n') {
+            is_newline = 1;
+            newsrc[j++] = src[i++];
+            continue;
         }
-        len = src - start;
-        if (len != 6 || memcmp("define", start, len) != 0) {
-            fprintf(stderr, "expected define but got %.*s\n", len, start);
+
+        if (is_newline == 0) {
+            newsrc[j++] = src[i++];
+            continue;
+        }
+
+        begin = i;
+        end = i;
+
+        if (is_newline == 1) {
+            end = skip_space(src, end);
+            if (src[end] != '#') {
+                is_newline = 0;
+                len = end - begin;
+                memcpy(newsrc + j, src + begin, len);
+                j += len;
+                i = end;
+                continue;
+            }
+        }
+
+        end++;
+        begin = end;
+
+        while (is_lower(src[end]) == 1) {
+            end++;
+        }
+
+        len = end - begin;
+        if (len != 6 || memcmp("define", src + begin, len) != 0) {
+            fprintf(stderr, "expected define but got %.*s\n", len, src + begin);
             exit(1);
         }
-        src = skip_whitespace(src);
-        start = src;
-        while (*src != ' ' && *src != '\0') {
-            if (*src == '\n') {
-                fprintf(stderr, "unexpected new line\n");
-                exit(1);
-            }
-            src++;
-        }
-        len = src - start;
 
         def = memnext(&defs);
-        def->name = start;
-        def->name_len = len;
-        def->has_args = 0;
-        def->args_len = 0;
+        meminit(&def->args, sizeof(string), 16);
 
-        src = skip_whitespace(src);
-        start = src;
+        end = skip_space(src, end);
+        begin = end;
 
-        if (*src == '(') {
-            src++;
-            def->has_args = 1;
-            while (*src != ')' && *src != '\0') {
-                int i;
+        while (is_alnum(src[end]) == 1) {
+            end++;
+        }
 
-                i = 0;
-                for (;;) {
-                    if (i >= 10) { // TODO(art): magic number
-                        fprintf(stderr, "only 10 arguments supported\n");
-                        exit(1);
-                    }
-                    start = src;
-                    def->args[i].name = start;
-                    while (*src >= 'a' && *src <= 'z') {
-                        src++;
-                    }
-                    def->args[i].len = src - start;
-                    i++;
-                    if (*src != ' ') {
-                        break;
-                    }
-                    src++;
+        len = end - begin;
+        make_string(&def->name, src + begin, len);
+
+        end = skip_space(src, end);
+
+        if (src[end] == '(') {
+            string *arg;
+
+            def->kind = DEF_FN;
+            end++;
+
+            while (src[end] != ')' && src[end] != '\0') {
+                end = skip_space(src, end);
+
+                begin = end;
+                while (is_alnum(src[end]) == 1) {
+                    end++;
                 }
-                def->args_len = i;
+
+                len = end - begin;
+                arg = memnext(&def->args);
+                make_string(arg, src + begin, len);
+
+                end = skip_space(src, end);
+                if (src[end] != ',') {
+                    break;
+                }
+
+                end++;
             }
-            if (*src == '\0') {
-                fprintf(stderr, "missing closing ')'\n");
+
+            if (src[end] == '\0') {
+                fprintf(stderr, "missing closing ')'");
                 exit(1);
             }
-            src++;
+
+            if (def->args.len == 0) {
+                fprintf(stderr, "empty argument list, use constant define\n");
+                exit(1);
+            }
+
+            end++;
+            end = skip_space(src, end);
+        } else {
+            def->kind = DEF_CONST;
         }
 
-        src = skip_whitespace(src);
-        start = src;
-        while (*src != '\n' && *src != '\0') {
-            src++;
-        }
-        len = src - start;
+        begin = end;
+        end = skip_until_newline(src, end);
+        len = end - begin;
+        make_string(&def->value, src + begin, len);
 
-        def->value = start;
-        def->value_len = len;
-
-        goto define_scan;
-    default:
-        goto define_done;
+        end++;
+        i = end;
+        is_newline = 1;
     }
-define_done:
 
-    while (*src) {
+    newsrc[j++] = '\0';
+
+    i = 0;
+    src = newsrc;
+    while (src[i] != '\0') {
+        int begin, end, len;
         struct define *def;
-        int old_len;
+        string str;
 
-        start = src;
-        while (*src == ' ' || *src == '\n' || *src == '\t' || *src == '\r') {
-            src++;
+        begin = i;
+        if (src[i] == '"') {
+            i++;
+            while (src[i] != '"' && src[i] != '\0') {
+                i++;
+            }
+            if (src[i] == '"') {
+                i++;
+            }
+            fwrite(src + begin, 1, i - begin, out);
+            continue;
         }
-        len = src - start;
-        if (len > 0) {
-            old_len = output.len;
-            output.len += len;
-            memgrow(&output);
-            memcpy(output.buf + old_len, start, len);
+
+        begin = i;
+        while (is_char(src[i]) == 0) {
+            i++;
+        }
+        fwrite(src + begin, 1, i - begin, out);
+
+        begin = i;
+        while (is_alnum(src[i]) == 1) {
+            i++;
         }
 
-        start = src;
-        while (*src != ' ' && *src != '\n' && *src != '\0') {
-            src++;
+        len = i - begin;
+        make_string(&str, src + begin, len);
+        def = defcmp(&defs, &str);
+        if (def == NULL) {
+            fwrite(src + begin, 1, len, out);
+            continue;
         }
-        len = src - start;
 
-        def = defcmp(&defs, start, len);
-        if (def != NULL) {
-            if (def->has_args) {
-                struct { char *value; int len; } arg_values[10];
-                char *end, *b, *e;
-                int i, found;
+        if (def->kind == DEF_CONST) {
+            fwrite(def->value.ptr, 1, def->value.len, out);
+            continue;
+        }
 
-                i = 0;
-                while (i < def->args_len) {
-                    src = skip_whitespace(src);
-                    arg_values[i].value = src;
-                    while (*src != ' ' && *src != '\n' && *src != '\0') {
-                        src++;
-                    }
-                    arg_values[i].len = src - arg_values[i].value;
+        if (def->kind != DEF_FN) {
+            fprintf(stderr, "unknown define kind %d\n", def->kind);
+            exit(1);
+        }
+
+        {
+            int step, found;
+            struct {
+                int len;
+                int cap;
+                int data_size;
+                string *buf;
+            } arg_values;
+
+            meminit(&arg_values, sizeof(string), def->args.len);
+
+            step = 0;
+            while (step < def->args.len) {
+                string *av;
+
+                if (src[i] == '\0') {
+                    fprintf(stderr, "not enough arguments\n");
+                    exit(1);
+                }
+
+                av = memnext(&arg_values);
+                i = skip_space(src, i);
+                begin = i;
+                while (src[i] != ' ' && src[i] != '\n' && src[i] != '\0') {
                     i++;
                 }
-
-                start = def->value;
-                end = def->value + def->value_len;
-                b = def->value;
-                e = def->value;
-                while (e < end) {
-                    while (*e != ' ' && *e != '\n' && e < end) {
-                        e++;
-                    }
-                    len = e - b;
-                    found = 0;
-                    for (int i = 0; i < def->args_len; ++i) {
-                        if (len == def->args[i].len &&
-                                memcmp(b, def->args[i].name, len) == 0) {
-                            found = 1;
-                            old_len = output.len;
-                            output.len += arg_values[i].len;
-                            memgrow(&output);
-                            memcpy(output.buf + old_len, arg_values[i].value,
-                                   arg_values[i].len);
-                            break;
-                        }
-                    }
-
-                    if (found == 0) {
-                        old_len = output.len;
-                        output.len += len;
-                        memgrow(&output);
-                        memcpy(output.buf + old_len, b, len);
-                    }
-                    memgrow(&output);
-                    output.buf[output.len++] = *e++;
-                    b = e;
-                }
-            } else {
-                old_len = output.len;
-                output.len += def->value_len;
-                memgrow(&output);
-                memcpy(output.buf + old_len, def->value, def->value_len);
+                make_string(av, src + begin, i - begin);
+                step++;
             }
-        } else {
-            old_len = output.len;
-            output.len += len;
-            memgrow(&output);
-            memcpy(output.buf + old_len, start, len);
+
+            begin = 0;
+            end = 0;
+            while (begin < def->value.len) {
+                end = skip_space(def->value.ptr, end);
+                fwrite(def->value.ptr + begin, 1, end - begin, out);
+
+                begin = end;
+                while (def->value.ptr[end] != ' ' && end < def->value.len) {
+                    end++;
+                }
+                make_string(&str, def->value.ptr + begin, end - begin);
+
+                found = 0;
+                for (int i = 0; i < def->args.len; ++i) {
+                    string *arg, *arg_val;
+
+                    arg = def->args.buf + i;
+                    if (string_cmp(arg, &str) == 1) {
+                        found = 1;
+                        arg_val = arg_values.buf + i;
+                        fwrite(arg_val->ptr, 1, arg_val->len, out);
+                        break;
+                    }
+                }
+
+                if (found == 0) {
+                    fwrite(str.ptr, 1, str.len, out);
+                }
+
+                begin = end;
+            }
         }
     }
-
-    fwrite(output.buf, 1, output.len, out);
 
     return 0;
 }
