@@ -34,4 +34,3 @@ int read_file(char *filepath, char **buf)
     (*buf)[statbuf.st_size] = '\0';
     return statbuf.st_size;
 }
-
