@@ -3,9 +3,10 @@
 #include <string.h>
 
 #include "../lib/mem.h"
+#include "../lib/path.h"
 
-#include "scanner.h"
 #include "../vm.h"
+#include "scanner.h"
 #include "parser.h"
 
 struct segment {
@@ -34,6 +35,7 @@ int main(int argc, char **argv)
     struct symtable st;
     struct parsed_values values;
     struct segment data, text;
+    char *outfile;
     FILE *out;
     int _start_addr, nsecs;
 
@@ -45,8 +47,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // TODO(art): extract name from input file
-    out = fopen("out.vm", "w");
+    outfile = create_outfile(*argv, "vm");
+    if (outfile == NULL) {
+        perror(NULL);
+        return 1;
+    }
+
+    out = fopen(outfile, "w");
     if (out == NULL) {
         perror(NULL);
         return 1;

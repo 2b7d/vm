@@ -15,12 +15,12 @@ if [[ $1 = "vm" ]]; then
 fi
 
 if [[ $1 = "asm" ]]; then
-    files="assembler/*.c lib/os.c lib/mem.c"
+    files="assembler/*.c lib/os.c lib/mem.c lib/path.c"
     outname=asm
 fi
 
 if [[ $1 = "preproc" ]]; then
-    files="preproc.c lib/os.c lib/mem.c"
+    files="preproc.c lib/os.c lib/mem.c lib/path.c"
     outname=preproc
 fi
 

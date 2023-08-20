@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "lib/os.h"
+#include "lib/path.h"
 #include "lib/mem.h"
 
 typedef struct {
@@ -121,7 +122,7 @@ struct define *defcmp(struct define_array *defs, string *ident)
 int main(int argc, char **argv)
 {
     struct define_array defs;
-    char *src, *newsrc;
+    char *src, *newsrc, *outfile;
     int src_len, i, j, is_newline;
     FILE *out;
 
@@ -145,7 +146,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    out = fopen("out.i", "w");
+    outfile = create_outfile(*argv, "i");
+    if (outfile == NULL) {
+        perror(NULL);
+        return 1;
+    }
+
+    out = fopen(outfile, "w");
     if (out == NULL) {
         perror(NULL);
         return 1;
