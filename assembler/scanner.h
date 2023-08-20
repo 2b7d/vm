@@ -1,3 +1,5 @@
+// #include "lib/sstring.h"
+
 struct scanner {
     char *src;
     char *filepath;
@@ -60,8 +62,7 @@ enum token_kind {
 
 struct token {
     enum token_kind kind;
-    char *lex;
-    int lex_len;
+    string lex;
     int line;
 };
 

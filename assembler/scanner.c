@@ -3,57 +3,57 @@
 #include <string.h>
 #include <assert.h>
 
+#include "../lib/sstring.h"
 #include "../lib/mem.h"
 #include "../lib/os.h"
 
 #include "scanner.h"
 
 struct kwd_entry {
-    char *str;
-    int str_len;
+    string kwd;
     enum token_kind tok;
 };
 
 static struct kwd_entry keywords[] = {
-    { .str = "halt",    .str_len = 4, .tok = TOK_HALT },
-    { .str = "push",    .str_len = 4, .tok = TOK_PUSH },
-    { .str = "pushb",   .str_len = 5, .tok = TOK_PUSHB },
-    { .str = "drop",    .str_len = 4, .tok = TOK_DROP },
-    { .str = "dropb",   .str_len = 5, .tok = TOK_DROPB },
-    { .str = "ld",      .str_len = 2, .tok = TOK_LD },
-    { .str = "ldb",     .str_len = 3, .tok = TOK_LDB },
-    { .str = "st",      .str_len = 2, .tok = TOK_ST },
-    { .str = "stb",     .str_len = 3, .tok = TOK_STB },
-    { .str = "ctw",     .str_len = 3, .tok = TOK_CTW },
-    { .str = "ctb",     .str_len = 3, .tok = TOK_CTB },
-    { .str = "add",     .str_len = 3, .tok = TOK_ADD },
-    { .str = "addb",    .str_len = 4, .tok = TOK_ADDB },
-    { .str = "sub",     .str_len = 3, .tok = TOK_SUB },
-    { .str = "subb",    .str_len = 4, .tok = TOK_SUBB },
-    { .str = "neg",     .str_len = 3, .tok = TOK_NEG },
-    { .str = "negb",    .str_len = 4, .tok = TOK_NEGB },
-    { .str = "eq",      .str_len = 2, .tok = TOK_EQ },
-    { .str = "eqb",     .str_len = 3, .tok = TOK_EQB },
-    { .str = "lt",      .str_len = 2, .tok = TOK_LT },
-    { .str = "ltb",     .str_len = 3, .tok = TOK_LTB },
-    { .str = "gt",      .str_len = 2, .tok = TOK_GT },
-    { .str = "gtb",     .str_len = 3, .tok = TOK_GTB },
-    { .str = "jmp",     .str_len = 3, .tok = TOK_JMP },
-    { .str = "cjmp",    .str_len = 4, .tok = TOK_CJMP },
-    { .str = "call",    .str_len = 4, .tok = TOK_CALL },
-    { .str = "ret",     .str_len = 3, .tok = TOK_RET },
-    { .str = "syscall", .str_len = 7, .tok = TOK_SYSCALL },
+    {.kwd = {.ptr = "halt",    .len = 4}, .tok = TOK_HALT},
+    {.kwd = {.ptr = "push",    .len = 4}, .tok = TOK_PUSH},
+    {.kwd = {.ptr = "pushb",   .len = 5}, .tok = TOK_PUSHB},
+    {.kwd = {.ptr = "drop",    .len = 4}, .tok = TOK_DROP},
+    {.kwd = {.ptr = "dropb",   .len = 5}, .tok = TOK_DROPB},
+    {.kwd = {.ptr = "ld",      .len = 2}, .tok = TOK_LD},
+    {.kwd = {.ptr = "ldb",     .len = 3}, .tok = TOK_LDB},
+    {.kwd = {.ptr = "st",      .len = 2}, .tok = TOK_ST},
+    {.kwd = {.ptr = "stb",     .len = 3}, .tok = TOK_STB},
+    {.kwd = {.ptr = "ctw",     .len = 3}, .tok = TOK_CTW},
+    {.kwd = {.ptr = "ctb",     .len = 3}, .tok = TOK_CTB},
+    {.kwd = {.ptr = "add",     .len = 3}, .tok = TOK_ADD},
+    {.kwd = {.ptr = "addb",    .len = 4}, .tok = TOK_ADDB},
+    {.kwd = {.ptr = "sub",     .len = 3}, .tok = TOK_SUB},
+    {.kwd = {.ptr = "subb",    .len = 4}, .tok = TOK_SUBB},
+    {.kwd = {.ptr = "neg",     .len = 3}, .tok = TOK_NEG},
+    {.kwd = {.ptr = "negb",    .len = 4}, .tok = TOK_NEGB},
+    {.kwd = {.ptr = "eq",      .len = 2}, .tok = TOK_EQ},
+    {.kwd = {.ptr = "eqb",     .len = 3}, .tok = TOK_EQB},
+    {.kwd = {.ptr = "lt",      .len = 2}, .tok = TOK_LT},
+    {.kwd = {.ptr = "ltb",     .len = 3}, .tok = TOK_LTB},
+    {.kwd = {.ptr = "gt",      .len = 2}, .tok = TOK_GT},
+    {.kwd = {.ptr = "gtb",     .len = 3}, .tok = TOK_GTB},
+    {.kwd = {.ptr = "jmp",     .len = 3}, .tok = TOK_JMP},
+    {.kwd = {.ptr = "cjmp",    .len = 4}, .tok = TOK_CJMP},
+    {.kwd = {.ptr = "call",    .len = 4}, .tok = TOK_CALL},
+    {.kwd = {.ptr = "ret",     .len = 3}, .tok = TOK_RET},
+    {.kwd = {.ptr = "syscall", .len = 7}, .tok = TOK_SYSCALL},
 
-    { .str = "byte", .str_len = 4, .tok = TOK_BYTE },
-    { .str = "word", .str_len = 4, .tok = TOK_WORD },
+    {.kwd = {.ptr = "byte", .len = 4}, .tok = TOK_BYTE},
+    {.kwd = {.ptr = "word", .len = 4}, .tok = TOK_WORD},
 
-    { .str = NULL, .str_len = 0, .tok = 0 } // art: end of array
+    {.kwd = {.ptr = NULL, .len = 0}, .tok = 0} // art: end of array
 };
 
-static enum token_kind lookup_keyword(char *sym, int sym_len)
+static enum token_kind lookup_keyword(string *sym)
 {
-    for (struct kwd_entry *e = keywords; e->str != NULL; ++e) {
-        if (e->str_len == sym_len && memcmp(e->str, sym, sym_len) == 0) {
+    for (struct kwd_entry *e = keywords; e->kwd.ptr != NULL; ++e) {
+        if (string_cmp(sym, &e->kwd) == 1) {
             return e->tok;
         }
     }
@@ -83,9 +83,8 @@ static void make_token(struct scanner *s, struct token *t,
                        enum token_kind kind)
 {
     t->kind = kind;
-    t->lex = s->src + s->pos;
-    t->lex_len = s->cur - s->pos;
     t->line = s->line;
+    string_make(&t->lex, s->src + s->pos, s->cur - s->pos);
 }
 
 static int is_digit(char ch)
@@ -157,8 +156,8 @@ scan_again:
             exit(1);
         }
         make_token(s, tok, TOK_STR);
-        tok->lex++;
-        tok->lex_len--;
+        tok->lex.ptr++;
+        tok->lex.len--;
         advance(s);
         break;
 
@@ -168,7 +167,7 @@ scan_again:
                 advance(s);
             }
             make_token(s, tok, TOK_ERR);
-            tok->kind = lookup_keyword(tok->lex, tok->lex_len);
+            tok->kind = lookup_keyword(&tok->lex);
         } else if (is_digit(s->ch) == 1) {
             while (is_digit(s->ch) == 1) {
                 advance(s);

@@ -13,35 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lib/sstring.h"
 #include "lib/os.h"
 #include "lib/path.h"
 #include "lib/mem.h"
-
-typedef struct {
-    char *ptr;
-    int len;
-} string;
-
-void make_string(string *s, char *ptr, int len)
-{
-    s->ptr = ptr;
-    s->len = len;
-}
-
-int string_cmp(string *s1, string *s2)
-{
-    if (s1->len != s2->len) {
-        return 0;
-    }
-
-    for (int i = 0; i < s1->len; ++i) {
-        if (s1->ptr[i] != s2->ptr[i]) {
-            return 0;
-        }
-    }
-
-    return 1;
-}
 
 struct define {
     enum {
@@ -217,7 +192,7 @@ int main(int argc, char **argv)
         }
 
         len = end - begin;
-        make_string(&def->name, src + begin, len);
+        string_make(&def->name, src + begin, len);
 
         end = skip_space(src, end);
 
@@ -237,7 +212,7 @@ int main(int argc, char **argv)
 
                 len = end - begin;
                 arg = memnext(&def->args);
-                make_string(arg, src + begin, len);
+                string_make(arg, src + begin, len);
 
                 end = skip_space(src, end);
                 if (src[end] != ',') {
@@ -266,7 +241,7 @@ int main(int argc, char **argv)
         begin = end;
         end = skip_until_newline(src, end);
         len = end - begin;
-        make_string(&def->value, src + begin, len);
+        string_make(&def->value, src + begin, len);
 
         end++;
         i = end;
@@ -313,7 +288,7 @@ int main(int argc, char **argv)
         }
 
         len = i - begin;
-        make_string(&str, src + begin, len);
+        string_make(&str, src + begin, len);
         def = defcmp(&defs, &str);
         if (def == NULL) {
             fwrite(src + begin, 1, len, out);
@@ -356,7 +331,7 @@ int main(int argc, char **argv)
                 while (src[i] != ' ' && src[i] != '\n' && src[i] != '\0') {
                     i++;
                 }
-                make_string(av, src + begin, i - begin);
+                string_make(av, src + begin, i - begin);
                 step++;
             }
 
@@ -370,7 +345,7 @@ int main(int argc, char **argv)
                 while (def->value.ptr[end] != ' ' && end < def->value.len) {
                     end++;
                 }
-                make_string(&str, def->value.ptr + begin, end - begin);
+                string_make(&str, def->value.ptr + begin, end - begin);
 
                 found = 0;
                 for (int i = 0; i < def->args.len; ++i) {

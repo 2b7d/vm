@@ -1,5 +1,6 @@
 // #include "scanner.h"
 // #include "vm.h"
+// #include "lib/sstring.h"
 
 struct parser {
     struct scanner s;
@@ -9,8 +10,7 @@ struct parser {
 };
 
 struct symbol {
-    char *label;
-    int label_len;
+    string label;
     int addr;
     int is_resolved;
 };

@@ -1,9 +1,20 @@
+/*
+ * Object file for now
+ *
+ * _start addr        - 2 bytes
+ * number of sections - 1 byte
+ * section kind       - 1 byte
+ * section size       - 2 bytes
+ * code               - section size bytes
+ */
+
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
 
 #include "../lib/mem.h"
 #include "../lib/path.h"
+#include "../lib/sstring.h"
 
 #include "../vm.h"
 #include "scanner.h"
@@ -18,17 +29,6 @@ struct segment {
         char *buf;
     } code;
 };
-
-/*
- * Object file for now
- *
- * _start addr        - 2 bytes
- * number of sections - 1 byte
- * section kind       - 1 byte
- * section size       - 2 bytes
- * code               - section size bytes
- */
-
 int main(int argc, char **argv)
 {
     struct parser p;
@@ -71,8 +71,7 @@ int main(int argc, char **argv)
         struct symbol *s;
 
         s = st.buf + i;
-        if (s->label_len == 6 &&
-                memcmp("_start", s->label, s->label_len) == 0) {
+        if (string_cmpc(&s->label, "_start") == 1) {
             _start_addr = s->addr;
             break;
         }
@@ -138,7 +137,7 @@ int main(int argc, char **argv)
                     sym = m->operand.as.sym;
                     if (sym->is_resolved == 0) {
                         // TODO(art): add file position
-                        fprintf(stderr, "undefined symbol %.*s\n", sym->label_len, sym->label);
+                        fprintf(stderr, "undefined symbol %.*s\n", sym->label.len, sym->label.ptr);
                         return 1;
                     }
                     memcpy(text.code.buf + old_len, &sym->addr,
