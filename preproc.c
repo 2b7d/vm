@@ -276,21 +276,27 @@ int main(int argc, char **argv)
         string str;
 
         begin = i;
-        if (src[i] == '"') {
-            i++;
-            while (src[i] != '"' && src[i] != '\0') {
+        while (is_char(src[i]) == 0 && src[i] != '\0') {
+            switch (src[i]) {
+            case '"':
+                i++;
+                while (src[i] != '"' && src[i] != '\0') {
+                    i++;
+                }
+                if (src[i] == '"') {
+                    i++;
+                }
+                break;
+            case '/':
+                if (src[i + 1] == '/') {
+                    i = skip_until_newline(src, i);
+                } else {
+                    i++;
+                }
+                break;
+            default:
                 i++;
             }
-            if (src[i] == '"') {
-                i++;
-            }
-            fwrite(src + begin, 1, i - begin, out);
-            continue;
-        }
-
-        begin = i;
-        while (is_char(src[i]) == 0) {
-            i++;
         }
         fwrite(src + begin, 1, i - begin, out);
 
@@ -381,5 +387,6 @@ int main(int argc, char **argv)
         }
     }
 
+    fclose(out);
     return 0;
 }

@@ -9,7 +9,7 @@
 
 msg: .byte "hello, world", 10, 0
 
-strlen: // *b-4 buf => w length
+strlen: // *b-4 buf -> w length
     push 0 // w+2 index
 strlen_loop:
     push_loc 2
