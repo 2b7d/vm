@@ -24,6 +24,14 @@ if [[ $1 = "preproc" ]]; then
     outname=preproc
 fi
 
+if [[ $1 = "all" ]]; then
+    ./build.sh vm $2 &
+    ./build.sh asm $2 &
+    ./build.sh preproc $2 &
+    wait
+    exit
+fi
+
 if [[ $2 = "prod" ]]; then
     flags=${flags/-g/-O2}
 fi
