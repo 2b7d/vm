@@ -3,6 +3,18 @@
 
 #include "sstring.h"
 
+static int cstr_len(char *s)
+{
+    int len;
+
+    len = 0;
+    while (s[len] != '\0') {
+        len++;
+    }
+
+    return len;
+}
+
 void string_make(string *s, char *ptr, int len)
 {
     s->ptr = ptr;
@@ -13,12 +25,31 @@ void string_fromc(string *s, char *cstr)
 {
     int len;
 
-    len = 0;
-    while (cstr[len] != '\0') {
-        len++;
-    }
-
+    len = cstr_len(cstr);
     string_make(s, cstr, len);
+}
+
+void string_init(string *s, int len)
+{
+    s->len = len;
+    s->ptr = malloc(len);
+
+    if (s->ptr == NULL) {
+        perror("string_init malloc");
+        exit(1);
+    }
+}
+
+void string_init_fromc(string *s, char *cstr)
+{
+    int len;
+
+    len = cstr_len(cstr);
+    string_init(s, len);
+
+    for (int i = 0; i < len; ++i) {
+        s->ptr[i] = cstr[i];
+    }
 }
 
 void string_dup(string *dst, string *src)

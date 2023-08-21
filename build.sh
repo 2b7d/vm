@@ -31,6 +31,10 @@ case $1 in
         files="disassembler/main.c"
         outname=diasm
         ;;
+    linker)
+        files="linker/main.c lib/sstring.c lib/mem.c"
+        outname=ln
+        ;;
     all)
         ./build.sh vm $2 &
         ./build.sh assembler $2 &

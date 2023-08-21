@@ -1,10 +1,12 @@
 vm
-*.vm
 
 ppc
 *.i
 
 diasm
-*.s
 
 asm
+*.o
+
+ln
+*.vm

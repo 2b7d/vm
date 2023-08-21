@@ -5,6 +5,8 @@ typedef struct {
 
 void string_make(string *s, char *ptr, int len);
 void string_fromc(string *s, char *cstr);
+void string_init(string *s, int len);
+void string_init_fromc(string *s, char *cstr);
 
 void string_dup(string *dst, string *src);
 void string_cpy(string *dst, string *src);

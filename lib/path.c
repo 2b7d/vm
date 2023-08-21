@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "path.h"
@@ -20,7 +21,8 @@ char *create_outfile(char *in, char *ext)
 
     out = malloc(out_len + 1);
     if (out == NULL) {
-        return NULL;
+        perror("create_outfile malloc");
+        exit(1);
     }
 
     offset = in_len - 1;
