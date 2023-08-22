@@ -1,3 +1,5 @@
+.global _start
+
 _start:
     push 2
     push 4

@@ -15,6 +15,7 @@ char *create_outfile(char *in, char *ext)
         ext = default_ext;
     }
 
+    in = path_base(in);
     in_len = strlen(in);
     ext_len = strlen(ext);
     out_len = in_len + ext_len + 1; // art: +1 is for '.'
@@ -41,5 +42,37 @@ char *create_outfile(char *in, char *ext)
     offset += ext_len;
     out[offset] = '\0';
 
+    free(in);
     return out;
+}
+
+char *path_base(char *path)
+{
+    char *base;
+    int len, base_len, offset;
+
+    len = strlen(path);
+    offset = len - 1;
+
+    while (path[offset] != '/' && offset >= 0) {
+        offset--;
+    }
+
+    if (offset < 0) {
+        offset = 0;
+    } else {
+        offset++;
+    }
+
+    base_len = len - offset;
+    base = malloc(base_len + 1);
+    if (base == NULL) {
+        perror("path_base malloc");
+        exit(1);
+    }
+
+    memcpy(base, path + offset, base_len);
+    base[base_len] = 0;
+
+    return base;
 }
