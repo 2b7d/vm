@@ -40,6 +40,7 @@ case $1 in
         ./build.sh assembler $2 &
         ./build.sh preprocessor $2 &
         ./build.sh disassembler $2 &
+        ./build.sh linker $2 &
         wait
         exit 0
         ;;

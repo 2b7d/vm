@@ -6,6 +6,8 @@
 #define  pop_loc  (x) push _fp ld push x add st
 #define push_ret      push _rp ld
 
+.global _start
+
 msg: .byte "hello, world", 10, 0
 
 strlen: // *b-4 buf -> w length

@@ -56,6 +56,8 @@ enum token_kind {
 
     TOK_BYTE,
     TOK_WORD,
+    TOK_EXTERN,
+    TOK_GLOBAL,
 
     TOK_EOF
 };

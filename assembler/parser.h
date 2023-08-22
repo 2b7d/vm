@@ -9,17 +9,38 @@ struct parser {
     int cur;
 };
 
+enum symkind {
+    SYM_LOCAL = 0,
+    SYM_GLOBAL,
+    SYM_EXTERN
+};
+
 struct symbol {
+    enum symkind kind;
+    enum vm_section sec;
     string label;
     int addr;
     int is_resolved;
+    int idx;
 };
 
-struct symtable {
+struct symtab {
     int len;
     int cap;
     int data_size;
     struct symbol *buf;
+};
+
+struct relocation {
+    int loc;
+    int symidx;
+};
+
+struct relocations {
+    int len;
+    int cap;
+    int data_size;
+    struct relocation *buf;
 };
 
 struct operand {
@@ -68,6 +89,6 @@ struct parsed_values {
     struct parsed_value *buf;
 };
 
-void parse(struct parser *p, struct symtable *st, struct parsed_values *values);
+void parse(struct parser *p, struct symtab *st, struct relocations *rels, struct parsed_values *values);
 void make_parser(struct parser *p, char *filepath);
 int with_operand(enum vm_opcode op);

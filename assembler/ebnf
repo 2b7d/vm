@@ -1,4 +1,7 @@
-program = data_label* text_label* EOF
+program = extern_definition* global_definition* data_label* text_label* EOF
+
+extern_definition = "." "extern" symbol ("," symbol)*
+global_definition = "." "global" symbol ("," symbol)*
 
 data_label = symbol ":" "." ("byte"|"word") (number|string) ("," (number|string))*
 text_label = symbol ":" mnemonic*

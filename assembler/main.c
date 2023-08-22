@@ -1,13 +1,3 @@
-/*
- * Object file for now
- *
- * _start addr        - 2 bytes
- * number of sections - 1 byte
- * section kind       - 1 byte
- * section size       - 2 bytes
- * code               - section size bytes
- */
-
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -20,7 +10,7 @@
 #include "scanner.h"
 #include "parser.h"
 
-struct segment {
+struct section {
     enum vm_section kind;
     struct {
         int len;
@@ -33,12 +23,12 @@ struct segment {
 int main(int argc, char **argv)
 {
     struct parser p;
-    struct symtable st;
+    struct symtab st;
+    struct relocations rels;
     struct parsed_values values;
-    struct segment data, text;
+    struct section data, text;
     char *outfile;
     FILE *out;
-    int _start_addr, nsecs;
 
     argc--;
     argv++;
@@ -48,7 +38,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    outfile = create_outfile(*argv, "vm");
+    outfile = create_outfile(*argv, "o");
     if (outfile == NULL) {
         perror(NULL);
         return 1;
@@ -62,29 +52,10 @@ int main(int argc, char **argv)
 
     make_parser(&p, *argv);
     meminit(&st, sizeof(struct symbol), 128);
+    meminit(&rels, sizeof(struct relocation), 128);
     meminit(&values, sizeof(struct parsed_value), 256);
 
-    parse(&p, &st, &values);
-
-    _start_addr = -1;
-
-    for (int i = 0; i < st.len; ++i) {
-        struct symbol *s;
-
-        s = st.buf + i;
-        if (string_cmpc(&s->label, "_start") == 1) {
-            _start_addr = s->addr;
-            break;
-        }
-    }
-
-    // TODO(art): this should be done by linker, not assembler
-    if (_start_addr == -1) {
-        fprintf(stderr, "_start entry point is not defined\n");
-        return 1;
-    }
-
-    fwrite(&_start_addr, 2, 1, out);
+    parse(&p, &st, &rels, &values);
 
     data.kind = SECTION_DATA;
     text.kind = SECTION_TEXT;
@@ -136,7 +107,7 @@ int main(int argc, char **argv)
                     break;
                 case OPERAND_SYM:
                     sym = m->operand.as.sym;
-                    if (sym->is_resolved == 0) {
+                    if (sym->kind != SYM_EXTERN && sym->is_resolved == 0) {
                         // TODO(art): add file position
                         fprintf(stderr, "undefined symbol %.*s\n", sym->label.len, sym->label.ptr);
                         return 1;
@@ -154,26 +125,43 @@ int main(int argc, char **argv)
         }
     }
 
-    nsecs = 0;
-    if (data.code.len > 0) {
-        nsecs++;
-    }
-    if (text.code.len > 0) {
-        nsecs++;
-    }
+    // write header
+    fwrite(&st.len, 2, 1, out);
+    fwrite(&rels.len, 2, 1, out);
 
-    fwrite(&nsecs, 1, 1, out);
-
+    // write data
+    fwrite(&data.code.len, 2, 1, out);
     if (data.code.len > 0) {
-        fwrite(&data.kind, 1, 1, out);
-        fwrite(&data.code.len, 2, 1, out);
         fwrite(data.code.buf, 1, data.code.len, out);
     }
 
+    // write text
+    fwrite(&text.code.len, 2, 1, out);
     if (text.code.len > 0) {
-        fwrite(&text.kind, 1, 1, out);
-        fwrite(&text.code.len, 2, 1, out);
         fwrite(text.code.buf, 1, text.code.len, out);
+    }
+
+    // write symbols
+    for (int i = 0; i < st.len; ++i) {
+        struct symbol *s;
+
+        s = st.buf + i;
+        fwrite(&s->kind, 1, 1, out);
+        fwrite(&s->sec, 1, 1, out);
+        fwrite(&i, 2, 1, out);
+        fwrite(&s->addr, 2, 1, out);
+        fwrite(&s->label.len, 2, 1, out);
+        fwrite(s->label.ptr, 1, s->label.len, out);
+    }
+
+    // write relocations
+    for (int i = 0; i < rels.len; ++i) {
+        struct relocation *rel;
+
+        rel = rels.buf + i;
+
+        fwrite(&rel->loc, 2, 1, out);
+        fwrite(&rel->symidx, 2, 1, out);
     }
 
     fclose(out);

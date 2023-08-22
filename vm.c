@@ -102,7 +102,7 @@ void dump_ram(int start, int size)
 
 int main(int argc, char **argv)
 {
-    int halt, stack_start, nsecs;
+    int halt, stack_start;
     FILE *in;
 
     argc--;
@@ -124,29 +124,23 @@ int main(int argc, char **argv)
     mem_write(ram, RP, 0);
 
     fread(&ip, 2, 1, in);
-    fread(&nsecs, 1, 1, in);
 
-    while (nsecs > 0) {
-        enum vm_section kind;
+    {
         int size;
 
-        fread(&kind, 1, 1, in);
         fread(&size, 2, 1, in);
+        if (size != 0) {
+            int off;
 
-        switch (kind) {
-        case SECTION_DATA:
-            fread(ram+6, 1, size, in); // TODO(art): magic offset
-            mem_write(ram, SP, size+6); // TODO(art): magic offset
-            break;
-        case SECTION_TEXT:
-            fread(rom, 1, size, in);
-            break;
-        default:
-            fprintf(stderr, "unknown section kind %d\n", kind);
-            return 1;
+            off = 6; // TODO(art): magic number
+            fread(ram + off, 1, size, in);
+            mem_write(ram, SP, size + off);
         }
 
-        nsecs--;
+        fread(&size, 2, 1, in);
+        if (size != 0) {
+            fread(rom, 1, size, in);
+        }
     }
 
     if (ferror(in) == 1) {

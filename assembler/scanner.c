@@ -46,6 +46,8 @@ static struct kwd_entry keywords[] = {
 
     {.kwd = {.ptr = "byte", .len = 4}, .tok = TOK_BYTE},
     {.kwd = {.ptr = "word", .len = 4}, .tok = TOK_WORD},
+    {.kwd = {.ptr = "extern", .len = 6}, .tok = TOK_EXTERN},
+    {.kwd = {.ptr = "global", .len = 6}, .tok = TOK_GLOBAL},
 
     {.kwd = {.ptr = NULL, .len = 0}, .tok = 0} // art: end of array
 };
@@ -292,6 +294,10 @@ char *tok_to_str(enum token_kind kind)
 		return "byte";
     case TOK_WORD:
 		return "word";
+    case TOK_GLOBAL:
+		return "global";
+    case TOK_EXTERN:
+		return "extern";
 
     case TOK_EOF:
 		return "<end of file>";

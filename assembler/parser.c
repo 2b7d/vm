@@ -92,38 +92,6 @@ static enum vm_opcode lookup_opcode(enum token_kind kind)
     assert(0 && "unreachable");
 }
 
-static struct symbol *lookup_symbol(struct symtable *st, string *label)
-{
-    struct symbol *s;
-
-    for (int i = 0; i < st->len; ++i) {
-        s = st->buf + i;
-        if (string_cmp(&s->label, label) == 1) {
-            return s;
-        }
-    }
-
-    return NULL;
-}
-
-static struct symbol *insert_symbol(struct symtable *st, string *label,
-                                    int addr, int is_resolved)
-{
-    struct symbol *s;
-
-    s = lookup_symbol(st, label);
-    if (s != NULL) {
-        return s;
-    }
-
-    s = memnext(st);
-    s->addr = addr;
-    s->is_resolved = is_resolved;
-    string_dup(&s->label, label);
-
-    return s;
-}
-
 int with_operand(enum vm_opcode op)
 {
     return op == OP_PUSH || op == OP_PUSHB || op == OP_CALL;
@@ -157,6 +125,36 @@ static int next(struct parser *p, enum token_kind kind)
     return next < p->toks.len && p->toks.buf[next].kind == kind;
 }
 
+static struct symbol *symtab_lookup(struct symtab *st, string *label)
+{
+    for (int i = 0; i < st->len; ++i) {
+        struct symbol *s;
+
+        s = st->buf + i;
+        if (string_cmp(&s->label, label) == 1) {
+            return s;
+        }
+    }
+
+    return NULL;
+}
+
+static struct symbol *symtab_insert(struct symtab *st, enum symkind kind,
+                                    enum vm_section sec, string *label,
+                                    int addr, int is_resolved, int idx)
+{
+    struct symbol *s;
+
+    s = memnext(st);
+    s->kind = kind;
+    s->sec = sec;
+    s->addr = addr;
+    s->is_resolved = is_resolved;
+    s->idx = idx;
+    string_dup(&s->label, label);
+
+    return s;
+}
 static int parse_num(struct parser *p, int size)
 {
     struct token *num;
@@ -179,30 +177,6 @@ static int parse_num(struct parser *p, int size)
 
     // TODO(art): should overflow be an error?
     return atoi(buf);
-}
-
-static void parse_label_definition(struct parser *p, struct symtable *st,
-                                   int data_offset, int text_offset)
-{
-    struct token *label;
-    struct symbol *sym;
-
-    label = p->tok;
-
-    consume(p, TOK_SYM);
-    consume(p, TOK_COLON);
-
-    sym = lookup_symbol(st, &label->lex);
-    if (sym == NULL) {
-        sym = memnext(st);
-        string_dup(&sym->label, &label->lex);
-    }
-    if (p->tok->kind == TOK_DOT) {
-        sym->addr = data_offset;
-    } else {
-        sym->addr = text_offset;
-    }
-    sym->is_resolved = 1;
 }
 
 static int parse_data_label(struct parser *p, struct parsed_value *pv)
@@ -267,8 +241,9 @@ static int parse_data_label(struct parser *p, struct parsed_value *pv)
     return offset;
 }
 
-static int parse_mnemonic(struct parser *p, struct symtable *st,
-                          struct text_label *tl)
+static int parse_mnemonic(struct parser *p, struct symtab *st,
+                          struct relocations *rels, struct text_label *tl,
+                          int off)
 {
     struct mnemonic *m;
     int offset;
@@ -301,8 +276,21 @@ static int parse_mnemonic(struct parser *p, struct symtable *st,
         if (check_special(&p->tok->lex, &m->operand.as.num) == 1) {
             m->operand.kind = OPERAND_NUM;
         } else {
+            struct symbol *sym;
+            struct relocation *rel;
+
+            sym = symtab_lookup(st, &p->tok->lex);
+            if (sym == NULL) {
+                sym = symtab_insert(st, SYM_LOCAL, SECTION_TEXT, &p->tok->lex,
+                                    0, 0, st->len);
+            }
+
+            m->operand.as.sym = sym;
             m->operand.kind = OPERAND_SYM;
-            m->operand.as.sym = insert_symbol(st, &p->tok->lex, 0, 0);
+
+            rel = memnext(rels);
+            rel->loc = off + offset; // art: skip mnemonic
+            rel->symidx = sym->idx;
         }
     } else if (p->tok->kind == TOK_STR) {
         if (m->opcode == OP_CALL) {
@@ -329,8 +317,9 @@ static int parse_mnemonic(struct parser *p, struct symtable *st,
     return offset;
 }
 
-static int parse_text_label(struct parser *p, struct symtable *st,
-                            struct parsed_value *pv)
+static int parse_text_label(struct parser *p, struct symtab *st,
+                            struct relocations *rels, struct parsed_value *pv,
+                            int off)
 {
     struct text_label *tl;
     int offset;
@@ -346,7 +335,7 @@ static int parse_text_label(struct parser *p, struct symtable *st,
     meminit(tl, sizeof(struct mnemonic), 128);
 
     while (is_mnemonic(p->tok->kind) == 1) {
-        offset += parse_mnemonic(p, st, tl);
+        offset += parse_mnemonic(p, st, rels, tl, off + offset);
     }
 
     if (p->tok->kind != TOK_EOF &&
@@ -360,23 +349,87 @@ static int parse_text_label(struct parser *p, struct symtable *st,
     return offset;
 }
 
-void parse(struct parser *p, struct symtable *st, struct parsed_values *values)
+static void parse_symbol_directive(struct parser *p, struct symtab *st)
 {
-    struct parsed_value *pv;
+    enum symkind kind;
+
+    consume(p, TOK_DOT);
+
+    if (p->tok->kind != TOK_GLOBAL && p->tok->kind != TOK_EXTERN) {
+        fprintf(stderr, "%s:%d: expected global or extern but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
+        exit(1);
+    }
+
+    kind = SYM_GLOBAL;
+    if (p->tok->kind == TOK_EXTERN) {
+        kind = SYM_EXTERN;
+    }
+
+    advance(p);
+
+    for (;;) {
+        struct token *symtok;
+        struct symbol *sym;
+
+        symtok = p->tok;
+        consume(p, TOK_SYM);
+
+        sym = symtab_lookup(st, &symtok->lex);
+        if (sym != NULL) {
+            sym->kind = kind;
+        } else {
+            symtab_insert(st, kind, SECTION_TEXT, &symtok->lex, 0, 0, st->len);
+        }
+
+        if (p->tok->kind != TOK_COMMA) {
+            break;
+        }
+
+        advance(p);
+    }
+}
+
+void parse(struct parser *p, struct symtab *st, struct relocations *rels,
+           struct parsed_values *values)
+{
     int data_offset, text_offset;
 
-    data_offset = 6; // TODO(art): should be in config or something?
+    data_offset = 0;
     text_offset = 0;
 
     while (p->tok->kind != TOK_EOF) {
-        parse_label_definition(p, st, data_offset, text_offset);
+        struct token *label;
+        struct symbol *sym;
+        struct parsed_value *pv;
+
+        if (p->tok->kind == TOK_DOT) {
+            parse_symbol_directive(p, st);
+            continue;
+        }
+
+        label = p->tok;
+
+        consume(p, TOK_SYM);
+        consume(p, TOK_COLON);
+
+        sym = symtab_lookup(st, &label->lex);
+        if (sym == NULL) {
+            sym = symtab_insert(st, SYM_LOCAL, SECTION_TEXT, &label->lex,
+                                0, 1, st->len);
+        } else {
+            sym->is_resolved = 1;
+        }
 
         pv = memnext(values);
 
         if (p->tok->kind == TOK_DOT) {
+            sym->addr = data_offset;
+            sym->sec = SECTION_DATA;
             data_offset += parse_data_label(p, pv);
         } else if (is_mnemonic(p->tok->kind) == 1) {
-            text_offset += parse_text_label(p, st, pv);
+            sym->addr = text_offset;
+            sym->sec = SECTION_TEXT;
+            text_offset += parse_text_label(p, st, rels, pv, text_offset);
         } else {
             fprintf(stderr, "%s:%d: expected directive or mnemonic but got %s\n", p->s.filepath, p->tok->line, tok_to_str(p->tok->kind));
             exit(1);
