@@ -7,6 +7,7 @@
 #include "../lib/sstring.h"
 
 #include "../vm.h"
+#include "../linker/ln.h"
 #include "scanner.h"
 #include "parser.h"
 
@@ -52,7 +53,7 @@ int main(int argc, char **argv)
 
     make_parser(&p, *argv);
     meminit(&st, sizeof(struct symbol), 128);
-    meminit(&rels, sizeof(struct relocation), 128);
+    meminit(&rels, sizeof(struct ln_relocation), 128);
     meminit(&values, sizeof(struct parsed_value), 256);
 
     parse(&p, &st, &rels, &values);
@@ -156,7 +157,7 @@ int main(int argc, char **argv)
 
     // write relocations
     for (int i = 0; i < rels.len; ++i) {
-        struct relocation *rel;
+        struct ln_relocation *rel;
 
         rel = rels.buf + i;
 

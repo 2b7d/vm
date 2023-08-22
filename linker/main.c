@@ -35,50 +35,31 @@
 
 #include "../vm.h"
 
-struct header {
-    int nsyms;
-    int nrels;
-};
-
-struct symbol {
-    enum {
-        SYM_LOCAL = 0,
-        SYM_GLOBAL,
-        SYM_EXTERN
-    } kind;
-    enum vm_section sec;
-    int idx;
-    int addr;
-    string label;
-};
+#include "ln.h"
 
 struct gsymbol {
     int modidx;
     int symidx;
 };
 
-struct relocation {
-    int loc;
-    int symidx;
-};
 
 struct module {
     int idx;
 
-    struct header header;
+    struct ln_header header;
 
     struct {
         int len;
         int cap;
         int data_size;
-        struct symbol *buf;
+        struct ln_symbol *buf;
     } symtab;
 
     struct {
         int len;
         int cap;
         int data_size;
-        struct relocation *buf;
+        struct ln_relocation *buf;
     } rels;
 
     string data;
@@ -106,10 +87,10 @@ int valid_idx(int idx, int max)
     return idx >= 0 && idx < max;
 }
 
-struct symbol *gsymtab_get_symbol(struct gsymbol *gsym)
+struct ln_symbol *gsymtab_get_symbol(struct gsymbol *gsym)
 {
     struct module *mod;
-    struct symbol *sym;
+    struct ln_symbol *sym;
 
     if (valid_idx(gsym->modidx, modules.len) == 0) {
         fprintf(stderr, "module index %d is out of bound\n", gsym->modidx);
@@ -126,11 +107,11 @@ struct symbol *gsymtab_get_symbol(struct gsymbol *gsym)
     return sym;
 }
 
-struct symbol *gsymtab_lookup(string *label)
+struct ln_symbol *gsymtab_lookup(string *label)
 {
     for (int i = 0; i < gsymtab.len; ++i) {
         struct gsymbol *gs;
-        struct symbol *s;
+        struct ln_symbol *s;
 
         gs = gsymtab.buf + i;
         s = gsymtab_get_symbol(gs);
@@ -175,10 +156,10 @@ void read_symbols(struct module *m, int doff, int toff, FILE *stream)
         return;
     }
 
-    meminit(&m->symtab, sizeof(struct symbol), 256);
+    meminit(&m->symtab, sizeof(struct ln_symbol), 256);
 
     for (int i = 0; i < m->header.nsyms; ++i) {
-        struct symbol *sym;
+        struct ln_symbol *sym;
         int nlabel;
 
         nlabel = 0;
@@ -227,10 +208,10 @@ void read_relocations(struct module *m, FILE *stream)
         return;
     }
 
-    meminit(&m->rels, sizeof(struct relocation), 128);
+    meminit(&m->rels, sizeof(struct ln_relocation), 128);
 
     for (int i = 0; i < m->header.nrels; ++i) {
-        struct relocation *rel;
+        struct ln_relocation *rel;
 
         rel = memnext(&m->rels);
         fread(&rel->loc, 2, 1, stream);
@@ -246,8 +227,8 @@ void relocate_symbols()
         mod = modules.buf + i;
 
         for (int j = 0; j < mod->rels.len; ++j) {
-            struct relocation *rel;
-            struct symbol *sym;
+            struct ln_relocation *rel;
+            struct ln_symbol *sym;
             int addr;
 
             rel = mod->rels.buf + j;
@@ -259,7 +240,7 @@ void relocate_symbols()
             sym = mod->symtab.buf + rel->symidx;
             addr = sym->addr;
             if (sym->kind == SYM_EXTERN) {
-                struct symbol *global;
+                struct ln_symbol *global;
 
                 global = gsymtab_lookup(&sym->label);
                 if (global == NULL) {
@@ -364,7 +345,7 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < gsymtab.len; ++i) {
         struct gsymbol *gsym;
-        struct symbol *sym;
+        struct ln_symbol *sym;
 
         gsym = gsymtab.buf + i;
         sym = gsymtab_get_symbol(gsym);

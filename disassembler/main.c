@@ -1,7 +1,11 @@
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 
+#include "../lib/sstring.h"
+
 #include "../vm.h"
+#include "../linker/ln.h"
 
 char *sec_to_str(enum vm_section kind)
 {
@@ -15,9 +19,24 @@ char *sec_to_str(enum vm_section kind)
     }
 }
 
+char *symkind_to_str(enum ln_symkind kind)
+{
+    switch (kind) {
+    case SYM_LOCAL:
+        return "LOCAL";
+    case SYM_GLOBAL:
+        return "GLOBAL";
+    case SYM_EXTERN:
+        return "EXTERN";
+    default:
+        assert(0 && "unreachable");
+    }
+}
+
 int main(int argc, char **argv)
 {
-    int _start_addr, nsecs;
+    string data, text;
+    struct ln_header header;
     FILE *in;
 
     argc--;
@@ -34,157 +53,205 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    fread(&_start_addr, 2, 1, in);
-    fread(&nsecs, 1, 1, in);
+    memset(&header, 0, sizeof(struct ln_header));
+    fread(&header.nsyms, 2, 1, in);
+    fread(&header.nrels, 2, 1, in);
 
-    printf("_start addr:        %d\n"
-           "number of sections: %d\n\n",
-           _start_addr, nsecs);
+    printf("Header\n"
+            "    nsyms: %d\n"
+            "    nrels: %d\n", header.nsyms, header.nrels);
 
-    for (int i = 0; i < nsecs; ++i) {
-        enum vm_section kind;
-        int len, op, word, cur;
 
-        fread(&kind, 1, 1, in);
-        fread(&len, 2, 1, in);
+    data.len = 0;
+    fread(&data.len, 2, 1, in);
+    if (data.len > 0) {
+        string_init(&data, data.len);
+        fread(data.ptr, 1, data.len, in);
+    }
 
-        printf("Section: %s\n"
-               "Size:    %d\n"
-               "----------------------\n",
-               sec_to_str(kind), len);
+    text.len = 0;
+    fread(&text.len, 2, 1, in);
+    if (text.len > 0) {
+        string_init(&text, text.len);
+        fread(text.ptr, 1, text.len, in);
+    }
 
-        if (kind == SECTION_DATA) {
-            char ch;
-            int j, col;
+    if (header.nsyms > 0) {
+        printf("Symbols\n");
+    }
 
-            j = 0;
-            col = 0;
-            while (j < len) {
-                fread(&ch, 1, 1, in);
-                printf("%5d: %5d ", j + 6, ch); // TODO(art): magic number
-                col++;
-                if (col == 3) {
-                    col = 0;
-                    printf("\n");
-                }
-                j++;
+    for (int i = 0; i < header.nsyms; ++i) {
+        struct ln_symbol s;
+
+        memset(&s, 0, sizeof(struct ln_symbol));
+
+        fread(&s.kind, 1, 1, in);
+        fread(&s.sec, 1, 1, in);
+        fread(&s.idx, 2, 1, in);
+        fread(&s.addr, 2, 1, in);
+
+        fread(&s.label.len, 2, 1, in);
+        string_init(&s.label, s.label.len);
+        fread(s.label.ptr, 1, s.label.len, in);
+
+        printf("    kind(%6s) section(%4s) idx(%05d) addr(%05d) label(%.*s)\n", symkind_to_str(s.kind), sec_to_str(s.sec), s.idx, s.addr, s.label.len, s.label.ptr);
+    }
+
+    if (header.nrels > 0) {
+        printf("Relocations\n");
+    }
+
+    for (int i = 0; i < header.nrels; ++i) {
+        struct ln_relocation r;
+
+        memset(&r, 0, sizeof(struct ln_relocation));
+
+        fread(&r.loc, 2, 1, in);
+        fread(&r.symidx, 2, 1, in);
+
+        printf("    loc(%05d) symidx(%05d)\n", r.loc, r.symidx);
+    }
+
+    if (data.len > 0) {
+        char ch;
+        int i, col;
+
+        printf("Data(%d)\n", data.len);
+
+        i = 0;
+        col = 0;
+        while (i < data.len) {
+            ch = data.ptr[i];
+            printf("    %05d: %5d ", i + 6, ch); // TODO(art): magic number
+            col++;
+            if (col == 5) {
+                col = 0;
+                printf("\n");
             }
-            printf("\n\n");
-            continue;
+            i++;
         }
+        printf("\n");
+    }
 
-        cur = 0;
-        while (cur < len) {
-            fread(&op, 1, 1, in);
+    if (text.len > 0) {
+        enum vm_opcode op;
+        char ch;
+        int i, word;
+
+        printf("Text(%d)\n", text.len);
+
+        i = 0;
+        while (i < text.len) {
+            ch = text.ptr[i];
+            op = ch;
+
+            printf("    %05d: ", i);
+
+            i++;
 
             switch (op) {
             case OP_HALT:
-                printf("%5d: halt\n", cur);
+                printf("halt\n");
                 break;
 
             case OP_PUSH:
-                fread(&word, 2, 1, in);
-                printf("%5d: push %d\n", cur, word);
-                cur += 2;
+                word = text.ptr[i];
+                i += 2;
+                printf("push %d\n", word);
                 break;
             case OP_PUSHB:
-                fread(&word, 1, 1, in);
-                printf("%5d: pushb %d\n", cur, word);
-                cur++;
+                word = text.ptr[i++];
+                printf("pushb %d\n", word);
                 break;
             case OP_DROP:
-                printf("%5d: drop\n", cur);
+                printf("drop\n");
                 break;
             case OP_DROPB:
-                printf("%5d: dropb\n", cur);
+                printf("dropb\n");
                 break;
 
             case OP_LD:
-                printf("%5d: ld\n", cur);
+                printf("ld\n");
                 break;
             case OP_LDB:
-                printf("%5d: ldb\n", cur);
+                printf("ldb\n");
                 break;
             case OP_ST:
-                printf("%5d: st\n", cur);
+                printf("st\n");
                 break;
             case OP_STB:
-                printf("%5d: stb\n", cur);
+                printf("stb\n");
                 break;
 
             case OP_CTW:
-                printf("%5d: ctw\n", cur);
+                printf("ctw\n");
                 break;
             case OP_CTB:
-                printf("%5d: ctb\n", cur);
+                printf("ctb\n");
                 break;
 
             case OP_ADD:
-                printf("%5d: add\n", cur);
+                printf("add\n");
                 break;
             case OP_ADDB:
-                printf("%5d: addb\n", cur);
+                printf("addb\n");
                 break;
             case OP_SUB:
-                printf("%5d: sub\n", cur);
+                printf("sub\n");
                 break;
             case OP_SUBB:
-                printf("%5d: subb\n", cur);
+                printf("subb\n");
                 break;
             case OP_NEG:
-                printf("%5d: neg\n", cur);
+                printf("neg\n");
                 break;
             case OP_NEGB:
-                printf("%5d: negb\n", cur);
+                printf("negb\n");
                 break;
 
             case OP_EQ:
-                printf("%5d: eq\n", cur);
+                printf("eq\n");
                 break;
             case OP_EQB:
-                printf("%5d: eqb\n", cur);
+                printf("eqb\n");
                 break;
             case OP_LT:
-                printf("%5d: lt\n", cur);
+                printf("lt\n");
                 break;
             case OP_LTB:
-                printf("%5d: ltb\n", cur);
+                printf("ltb\n");
                 break;
             case OP_GT:
-                printf("%5d: gt\n", cur);
+                printf("gt\n");
                 break;
             case OP_GTB:
-                printf("%5d: gtb\n", cur);
+                printf("gtb\n");
                 break;
 
             case OP_JMP:
-                printf("%5d: jmp\n", cur);
+                printf("jmp\n");
                 break;
             case OP_CJMP:
-                printf("%5d: cjmp\n", cur);
+                printf("cjmp\n");
                 break;
 
             case OP_CALL:
-                fread(&word, 2, 1, in);
-                printf("%5d: call %d\n", cur, word);
-                cur += 2;
+                word = text.ptr[i];
+                i += 2;
+                printf("call %d\n", word);
                 break;
             case OP_RET:
-                printf("%5d: ret\n", cur);
+                printf("ret\n");
                 break;
 
             case OP_SYSCALL:
-                printf("%5d: syscall\n", cur);
+                printf("syscall\n");
                 break;
 
             default:
                 assert(0 && "unreachable");
             }
-
-            cur++;
         }
-
-        printf("\n");
     }
 
     return 0;

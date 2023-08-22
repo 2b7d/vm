@@ -28,7 +28,7 @@ case $1 in
         outname=ppc
         ;;
     disassembler)
-        files="disassembler/main.c"
+        files="disassembler/main.c lib/sstring.c"
         outname=diasm
         ;;
     linker)

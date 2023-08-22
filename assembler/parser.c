@@ -7,6 +7,8 @@
 #include "../lib/sstring.h"
 
 #include "../vm.h"
+#include "../linker/ln.h"
+
 #include "scanner.h"
 #include "parser.h"
 
@@ -139,7 +141,7 @@ static struct symbol *symtab_lookup(struct symtab *st, string *label)
     return NULL;
 }
 
-static struct symbol *symtab_insert(struct symtab *st, enum symkind kind,
+static struct symbol *symtab_insert(struct symtab *st, enum ln_symkind kind,
                                     enum vm_section sec, string *label,
                                     int addr, int is_resolved, int idx)
 {
@@ -277,7 +279,7 @@ static int parse_mnemonic(struct parser *p, struct symtab *st,
             m->operand.kind = OPERAND_NUM;
         } else {
             struct symbol *sym;
-            struct relocation *rel;
+            struct ln_relocation *rel;
 
             sym = symtab_lookup(st, &p->tok->lex);
             if (sym == NULL) {
@@ -351,7 +353,7 @@ static int parse_text_label(struct parser *p, struct symtab *st,
 
 static void parse_symbol_directive(struct parser *p, struct symtab *st)
 {
-    enum symkind kind;
+    enum ln_symkind kind;
 
     consume(p, TOK_DOT);
 

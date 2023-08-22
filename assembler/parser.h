@@ -1,6 +1,9 @@
-// #include "scanner.h"
-// #include "vm.h"
 // #include "lib/sstring.h"
+
+// #include "vm.h"
+// #include "linker/ln.h"
+
+// #include "scanner.h"
 
 struct parser {
     struct scanner s;
@@ -9,14 +12,8 @@ struct parser {
     int cur;
 };
 
-enum symkind {
-    SYM_LOCAL = 0,
-    SYM_GLOBAL,
-    SYM_EXTERN
-};
-
 struct symbol {
-    enum symkind kind;
+    enum ln_symkind kind;
     enum vm_section sec;
     string label;
     int addr;
@@ -31,16 +28,11 @@ struct symtab {
     struct symbol *buf;
 };
 
-struct relocation {
-    int loc;
-    int symidx;
-};
-
 struct relocations {
     int len;
     int cap;
     int data_size;
-    struct relocation *buf;
+    struct ln_relocation *buf;
 };
 
 struct operand {
