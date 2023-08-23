@@ -35,12 +35,17 @@ case $1 in
         files="linker/main.c lib/sstring.c lib/mem.c"
         outname=ln
         ;;
+    programming-language)
+        files="programming-language/*.c lib/sstring.c lib/mem.c lib/os.c"
+        outname=pl
+        ;;
     all)
         ./build.sh vm $2 &
         ./build.sh assembler $2 &
         ./build.sh preprocessor $2 &
         ./build.sh disassembler $2 &
         ./build.sh linker $2 &
+        ./build.sh programming-language $2 &
         wait
         exit 0
         ;;

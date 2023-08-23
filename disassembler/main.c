@@ -122,7 +122,7 @@ int main(int argc, char **argv)
         col = 0;
         while (i < data.len) {
             ch = data.ptr[i];
-            printf("    %05d: %5d ", i + 6, ch); // TODO(art): magic number
+            printf("    %05d: %5d ", i, ch);
             col++;
             if (col == 5) {
                 col = 0;
