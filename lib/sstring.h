@@ -13,3 +13,5 @@ void string_cpy(string *dst, string *src);
 
 int string_cmp(string *s1, string *s2);
 int string_cmpc(string *s, char *cstr);
+
+char *string_toc(string *s);

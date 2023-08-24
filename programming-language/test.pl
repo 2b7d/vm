@@ -1,12 +1,10 @@
-proc _start(): void {
-    let a: word;
-    let b: word;
-    let c: word;
+proc main() {
+    let a, b;
 
-    a = 3;
-    b = 5;
+    a = 5;
+    b = 8;
 
-    c = a + b;
+    a = a + b;
 
     return;
 }

@@ -10,8 +10,9 @@ typedef enum {
 
     TOK_PLUS,
 
-    TOK_COLON,
     TOK_SEMICOLON,
+    TOK_COMMA,
+
     TOK_LPAREN,
     TOK_RPAREN,
     TOK_LCURLY,
@@ -20,8 +21,6 @@ typedef enum {
     TOK_LET,
     TOK_PROC,
     TOK_RET,
-    TOK_WORD,
-    TOK_VOID,
 
     TOK_EOF
 } Token_Kind;

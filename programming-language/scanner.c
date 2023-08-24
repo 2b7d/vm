@@ -18,8 +18,6 @@ static Kwd_Entry keywords[] = {
     {.s = {.ptr = "let",    .len = 3}, .kind = TOK_LET},
     {.s = {.ptr = "proc",   .len = 4}, .kind = TOK_PROC},
     {.s = {.ptr = "return", .len = 6}, .kind = TOK_RET},
-    {.s = {.ptr = "word",   .len = 4}, .kind = TOK_WORD},
-    {.s = {.ptr = "void",   .len = 4}, .kind = TOK_VOID},
 
     {.s = {.ptr = "", .len = 0}, .kind = TOK_ERR} // art: end of array
 };
@@ -106,12 +104,13 @@ scan_again:
         advance(s);
         break;
 
-    case ':':
-        make_token(s, tok, TOK_COLON);
-        advance(s);
-        break;
     case ';':
         make_token(s, tok, TOK_SEMICOLON);
+        advance(s);
+        break;
+    case ',':
+
+        make_token(s, tok, TOK_COMMA);
         advance(s);
         break;
     case '(':
@@ -204,10 +203,11 @@ char *tokstr(Token_Kind kind)
     case TOK_PLUS:
 		return "+";
 
-    case TOK_COLON:
-		return ":";
     case TOK_SEMICOLON:
 		return ";";
+    case TOK_COMMA:
+		return ",";
+
     case TOK_LPAREN:
 		return "(";
     case TOK_RPAREN:
@@ -223,10 +223,6 @@ char *tokstr(Token_Kind kind)
 		return "proc";
     case TOK_RET:
 		return "return";
-    case TOK_WORD:
-		return "word";
-    case TOK_VOID:
-		return "void";
 
     case TOK_EOF:
 		return "<end of file>";

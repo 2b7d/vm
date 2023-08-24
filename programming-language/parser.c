@@ -96,9 +96,6 @@ static void parse_block(Parser *p, Stmt *s)
 
     meminit(&block->stmts, sizeof(Stmt), 64);
 
-    s->kind = STMT_BLOCK;
-    s->body = block;
-
     while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
         Stmt *tmp;
 
@@ -107,6 +104,9 @@ static void parse_block(Parser *p, Stmt *s)
     }
 
     consume(p, TOK_RCULRY);
+
+    s->kind = STMT_BLOCK;
+    s->body = block;
 }
 
 static void parse_let(Parser *p, Stmt *s)
@@ -121,11 +121,21 @@ static void parse_let(Parser *p, Stmt *s)
         exit(1);
     }
 
-    let->ident = p->tok;
+    meminit(&let->idents, sizeof(Token *), 16);
 
-    consume(p, TOK_IDENT);
-    consume(p, TOK_COLON);
-    consume(p, TOK_WORD);
+    for (;;) {
+        memgrow(&let->idents);
+        let->idents.buf[let->idents.len++] = p->tok;
+
+        consume(p, TOK_IDENT);
+
+        if (p->tok->kind != TOK_COMMA) {
+            break;
+        }
+
+        advance(p);
+    }
+
     consume(p, TOK_SEMICOLON);
 
     s->kind = STMT_LET;
@@ -172,8 +182,6 @@ static void parse_proc(Parser *p, Stmt *s)
     consume(p, TOK_IDENT);
     consume(p, TOK_LPAREN);
     consume(p, TOK_RPAREN);
-    consume(p, TOK_COLON);
-    consume(p, TOK_VOID);
 
     parse_block(p, &proc->body);
 
@@ -219,18 +227,6 @@ static void parse_statement(Parser *p, Stmt *s)
         parse_ret(p, s);
         break;
 
-    case TOK_NUM:
-    case TOK_EQ:
-    case TOK_PLUS:
-    case TOK_COLON:
-    case TOK_SEMICOLON:
-    case TOK_LPAREN:
-    case TOK_RPAREN:
-    case TOK_RCULRY:
-    case TOK_WORD:
-    case TOK_VOID:
-    case TOK_EOF:
-    case TOK_ERR:
     default:
         fprintf(stderr, "%s:%d: expected statement\n", p->s.filepath, p->tok->line);
         exit(1);

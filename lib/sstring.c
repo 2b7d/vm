@@ -95,3 +95,21 @@ int string_cmpc(string *s, char *cstr)
     string_fromc(&s2, cstr);
     return string_cmp(s, &s2);
 }
+
+char *string_toc(string *s)
+{
+    char *c;
+
+    c = malloc(s->len + 1);
+    if (c == NULL) {
+        perror("string_toc");
+        exit(1);
+    }
+
+    for (int i = 0; i < s->len; ++i) {
+        c[i] = s->ptr[i];
+    }
+
+    c[s->len] = '\0';
+    return c;
+}

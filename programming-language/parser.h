@@ -1,3 +1,4 @@
+// #include "lib/sstring.h"
 // #include "scanner.h"
 
 typedef struct {
@@ -9,7 +10,7 @@ typedef struct {
 
 typedef enum {
     EXPR_LIT = 0,
-    EXPR_BINARY,
+    EXPR_BINARY
 } Expr_Kind;
 
 typedef struct {
@@ -52,7 +53,12 @@ typedef struct {
 } Stmt_Block;
 
 typedef struct {
-    Token *ident;
+    struct {
+        int len;
+        int cap;
+        int data_size;
+        Token **buf;
+    } idents;
 } Stmt_Let;
 
 typedef struct {

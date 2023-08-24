@@ -5,7 +5,7 @@ set -e
 files=
 outname=
 
-flags="-g -Werror=declaration-after-statement -Werror=switch-enum -Werror=switch-default -Wall -Wextra -pedantic -std=c99"
+flags="-g -Werror=declaration-after-statement -Werror=switch-default -Wall -Wextra -pedantic -std=c99"
 incl=
 libs=
 
@@ -36,7 +36,7 @@ case $1 in
         outname=ln
         ;;
     programming-language)
-        files="programming-language/*.c lib/sstring.c lib/mem.c lib/os.c"
+        files="programming-language/*.c lib/sstring.c lib/mem.c lib/os.c lib/path.c"
         outname=pl
         ;;
     all)
