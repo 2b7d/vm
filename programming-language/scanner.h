@@ -9,9 +9,9 @@ typedef enum {
     TOK_EQ,
 
     TOK_PLUS,
+    TOK_MINUS,
 
     TOK_SEMICOLON,
-    TOK_COMMA,
 
     TOK_LPAREN,
     TOK_RPAREN,

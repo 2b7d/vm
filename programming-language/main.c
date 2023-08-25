@@ -1,19 +1,19 @@
 /*
- * program = statement* EOF
+ * program = declaration* EOF
  *
- * statement = block_stmt|let_stmt|assign_stmt|proc_stmt
+ * declaration = procedure|file_variable
+ * procedure = "proc" ident "(" ")" block
+ * file_variable = "let" ident "=" number ";"
+ * block_variable = "let" ident "=" expression ";"
  *
- * block_stmt  = "{" statement* "}"
- * let_stmt    = "let" ident ("," ident)* ";"
- * assign_stmt = ident "=" expression ";"
- * proc_stmt   = "proc" ident "(" ")" block_stmt
- * ret_stmt    = "return" ";"
- * halt_sttm   = "halt" ";"
+ * statement = assign|return|block
+ * assign    = ident "=" expression ";"
+ * return    = "return" ";"
+ * block = "{" block_variable* statement* "}"
  *
  * expression = term
- *
- * term    = primary ("+" primary)*
- * primary = ident|number
+ * term = primary (("+"|"-") primary)*
+ * primary = ident|number|"(" expression ")"
  *
  * ident  = char (char|digit)
  * number = digit+
@@ -36,52 +36,75 @@
 typedef struct {
     string name;
     int offset;
-    int value;
-} Var;
+} Symbol;
 
-struct {
-    int len;
-    int cap;
-    int data_size;
-    Var *buf;
-} variables;
+typedef struct scope {
+    struct {
+        int len;
+        int cap;
+        int data_size;
+        Symbol *buf;
+    } symtab;
+    struct scope *prev;
+} Scope;
 
-void declare_var(string *name, int offset)
+void gen_decl(Decl *decl, Scope *scope, FILE *out);
+
+void scope_make(Scope *new, Scope *prev)
 {
-    Var *var;
-
-    var = memnext(&variables);
-
-    string_dup(&var->name, name);
-    var->offset = offset;
-    var->value = 0;
+    new->prev = prev;
+    meminit(&new->symtab, sizeof(Symbol), 128);
 }
 
-Var *lookup_var(string *name)
+void scope_declare_var(Scope *s, string *name, int is_file_var)
 {
-    for (int i = 0; i < variables.len; ++i) {
-        Var *tmp;
+    Symbol *sym = memnext(&s->symtab);
+    int offset = s->symtab.len;
 
-        tmp = variables.buf + i;
-        if (string_cmp(&tmp->name, name) == 1) {
-            return tmp;
+    if (is_file_var) {
+        offset = -1;
+    }
+
+    sym->offset = offset;
+    string_dup(&sym->name, name);
+}
+
+Symbol *scope_lookup_var(Scope *s, string *name)
+{
+    while (s != NULL) {
+        for (int i = 0; i < s->symtab.len; ++i) {
+            Symbol *sym = s->symtab.buf + i;
+
+            if (string_cmp(&sym->name, name) == 1) {
+                return sym;
+            }
         }
+
+        s = s->prev;
     }
 
     return NULL;
 }
 
-void eval(Expr *e, FILE *out)
+void gen_expr(Expr *expr, Scope *scope, FILE *out)
 {
-    Var *var;
+    Expr_Binary *binary;
+    Expr_Lit *lit;
+    Symbol *sym;
     char *lex;
 
-    Expr_Lit *lit;
-    Expr_Binary *binary;
+    switch (expr->kind) {
+    case EXPR_CONST:
+        lit = expr->body;
 
-    switch (e->kind) {
+        assert(lit->value->kind == TOK_NUM);
+
+        lex = string_toc(&lit->value->lex);
+        fprintf(out, ".word %d\n", atoi(lex));
+        free(lex);
+        break;
     case EXPR_LIT:
-        lit = e->body;
+        lit = expr->body;
 
         switch (lit->value->kind) {
         case TOK_NUM:
@@ -90,9 +113,13 @@ void eval(Expr *e, FILE *out)
             free(lex);
             break;
         case TOK_IDENT:
-            var = lookup_var(&lit->value->lex);
-            assert(var != NULL);
-            fprintf(out, "push _fp ld push %d add ld\n", var->offset * 2);
+            sym = scope_lookup_var(scope, &lit->value->lex);
+            assert(sym != NULL);
+            if (sym->offset == -1) {
+                fprintf(out, "push %.*s ld\n", sym->name.len, sym->name.ptr);
+            } else {
+                fprintf(out, "push _fp ld push %d add ld\n", sym->offset * 2);
+            }
             break;
         default:
             assert(0 && "unreachable");
@@ -100,16 +127,18 @@ void eval(Expr *e, FILE *out)
 
         break;
     case EXPR_BINARY:
-        binary = e->body;
+        binary = expr->body;
 
-        eval(&binary->x, out);
-        eval(&binary->y, out);
+        gen_expr(&binary->x, scope, out);
+        gen_expr(&binary->y, scope, out);
 
         switch (binary->op->kind) {
         case TOK_PLUS:
             fprintf(out, "add\n");
             break;
-
+        case TOK_MINUS:
+            fprintf(out, "sub\n");
+            break;
         default:
             assert(0 && "unreachable");
         }
@@ -120,51 +149,69 @@ void eval(Expr *e, FILE *out)
     }
 }
 
-void generate(Stmt *s, FILE *out)
+void gen_stmt(Stmt *stmt, Scope *scope, FILE *out)
 {
-    Var *var;
-
-    Stmt_Proc *proc;
-    Stmt_Block *block;
-    Stmt_Let *let;
     Stmt_Assign *assign;
+    Stmt_Block *block;
+    Scope new_scope;
+    Symbol *sym;
 
-    switch (s->kind) {
+    switch (stmt->kind) {
     case STMT_BLOCK:
-        block = s->body;
+        block = stmt->body;
+        scope_make(&new_scope, scope);
+
+        for (int i = 0; i < block->decls.len; ++i) {
+            Decl *tmp = block->decls.buf + i;
+            gen_decl(tmp, &new_scope, out);
+        }
 
         for (int i = 0; i < block->stmts.len; ++i) {
-            generate(block->stmts.buf + i, out);
+            Stmt *tmp = block->stmts.buf + i;
+            gen_stmt(tmp, &new_scope, out);
         }
-        break;
-    case STMT_LET:
-        let = s->body;
 
-        for (int i = 0; i < let->idents.len; ++i) {
-            Token *tmp;
-
-            tmp = let->idents.buf[i];
-            declare_var(&tmp->lex, i + 1);
-            fprintf(out, "push 0\n");
-        }
         break;
     case STMT_ASSIGN:
-        assign = s->body;
+        assign = stmt->body;
+        sym = scope_lookup_var(scope, &assign->ident->lex);
 
-        eval(&assign->value, out);
-        var = lookup_var(&assign->ident->lex);
-        assert(var != NULL);
-
-        fprintf(out, "push _fp ld push %d add st\n", var->offset * 2);
-        break;
-    case STMT_PROC:
-        proc = s->body;
-
-        fprintf(out, "%.*s:\n", proc->ident->lex.len, proc->ident->lex.ptr);
-        generate(&proc->body, out);
+        gen_expr(&assign->value, scope, out);
+        if (sym->offset == -1) {
+            fprintf(out, "push %.*s\n", sym->name.len, sym->name.ptr);
+        } else {
+            fprintf(out, "push _fp ld push %d add st\n", sym->offset * 2);
+        }
         break;
     case STMT_RET:
         fprintf(out, "ret\n");
+        break;
+    default:
+        assert(0 && "unreachable");
+    }
+}
+
+void gen_decl(Decl *decl, Scope *scope, FILE *out)
+{
+    Decl_Var *var;
+    Decl_Proc *proc;
+
+    switch (decl->kind) {
+    case DECL_FILE_VAR:
+        var = decl->body;
+        scope_declare_var(scope, &var->ident->lex, 1);
+        fprintf(out, "%.*s:", var->ident->lex.len, var->ident->lex.ptr);
+        gen_expr(&var->value, scope, out);
+        break;
+    case DECL_BLOCK_VAR:
+        var = decl->body;
+        scope_declare_var(scope, &var->ident->lex, 0);
+        gen_expr(&var->value, scope, out);
+        break;
+    case DECL_PROC:
+        proc = decl->body;
+        fprintf(out, "%.*s:\n", proc->ident->lex.len, proc->ident->lex.ptr);
+        gen_stmt(&proc->body, scope, out);
         break;
     default:
         assert(0 && "unreachable");
@@ -176,7 +223,8 @@ int main(int argc, char **argv)
     char *outpath;
     FILE *out;
     Parser p;
-    Stmts ss;
+    Decls decls;
+    Scope global_scope;
 
     argc--;
     argv++;
@@ -186,11 +234,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    meminit(&variables, sizeof(Var), 256);
-    meminit(&ss, sizeof(Stmt), 256);
+    scope_make(&global_scope, NULL);
+    meminit(&decls, sizeof(Decl), 256);
     make_parser(&p, *argv);
 
-    parse(&p, &ss);
+    parse(&p, &decls);
 
     outpath = create_outfile(*argv, "asm");
     out = fopen(outpath, "w");
@@ -199,17 +247,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // TODO(art): bug in assembler if put this after generation
     fprintf(out, ".global _start\n"
                  "_start:\n"
                  "call main\n"
                  "halt\n");
 
-    for (int i = 0; i < ss.len; ++i) {
-        Stmt *s;
+    for (int i = 0; i < decls.len; ++i) {
+        Decl *decl;
 
-        s = ss.buf + i;
-
-        generate(s, out);
+        decl = decls.buf + i;
+        gen_decl(decl, &global_scope, out);
     }
 
     return 0;

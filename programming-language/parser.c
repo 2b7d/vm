@@ -8,7 +8,8 @@
 #include "scanner.h"
 #include "parser.h"
 
-static void parse_statement(Parser *p, Stmt *s);
+static void statement(Parser *p, Stmt *stmt);
+static void expression(Parser *p, Expr *e);
 
 static void advance(Parser *p)
 {
@@ -30,9 +31,16 @@ static void consume(Parser *p, Token_Kind kind)
     advance(p);
 }
 
-static void parse_primary(Parser *p, Expr *e)
+static void primary(Parser *p, Expr *expr)
 {
     Expr_Lit *lit;
+
+    if (p->tok->kind == TOK_LPAREN) {
+        advance(p);
+        expression(p, expr);
+        consume(p, TOK_RPAREN);
+        return;
+    }
 
     if (p->tok->kind != TOK_IDENT && p->tok->kind != TOK_NUM) {
         fprintf(stderr, "%s:%d: expected number or identifier but got %s\n", p->s.filepath, p->tok->line, tokstr(p->tok->kind));
@@ -41,114 +49,71 @@ static void parse_primary(Parser *p, Expr *e)
 
     lit = malloc(sizeof(Expr_Lit));
     if (lit == NULL) {
-        perror("parse_primary");
+        perror("primary");
         exit(1);
     }
 
     lit->value = p->tok;
     advance(p);
 
-    e->kind = EXPR_LIT;
-    e->body = lit;
+    expr->kind = EXPR_LIT;
+    expr->body = lit;
 }
 
-static void parse_term(Parser *p, Expr *e)
+static void term(Parser *p, Expr *expr)
 {
-    parse_primary(p, e);
+    primary(p, expr);
 
-    if (p->tok->kind == TOK_PLUS) {
-        Expr_Binary *binary;
-
-        binary = malloc(sizeof(Expr_Binary));
+    while (p->tok->kind == TOK_PLUS || p->tok->kind == TOK_MINUS) {
+        Expr_Binary *binary = malloc(sizeof(Expr_Binary));
         if (binary == NULL) {
-            perror("parse_term");
+            perror("term");
             exit(1);
         }
 
-        memcpy(&binary->x, e, sizeof(Expr));
-
+        memcpy(&binary->x, expr, sizeof(Expr));
         binary->op = p->tok;
         advance(p);
 
-        parse_primary(p, &binary->y);
+        primary(p, &binary->y);
 
-        e->kind = EXPR_BINARY;
-        e->body = binary;
+        expr->kind = EXPR_BINARY;
+        expr->body = binary;
     }
 }
 
-static void parse_expression(Parser *p, Expr *e)
+static void expression(Parser *p, Expr *expr)
 {
-    parse_term(p, e);
+    term(p, expr);
 }
 
-static void parse_block(Parser *p, Stmt *s)
+static void constant_expression(Parser *p, Expr *expr)
 {
-    Stmt_Block *block;
+    Expr_Lit *lit;
 
-    consume(p, TOK_LCURLY);
-
-    block = malloc(sizeof(Stmt_Block));
-    if (block == NULL) {
-        perror("parse_block");
+    if (p->tok->kind != TOK_NUM) {
+        fprintf(stderr, "%s:%d: expected constant expression\n", p->s.filepath, p->tok->line);
         exit(1);
     }
 
-    meminit(&block->stmts, sizeof(Stmt), 64);
-
-    while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
-        Stmt *tmp;
-
-        tmp = memnext(&block->stmts);
-        parse_statement(p, tmp);
-    }
-
-    consume(p, TOK_RCULRY);
-
-    s->kind = STMT_BLOCK;
-    s->body = block;
-}
-
-static void parse_let(Parser *p, Stmt *s)
-{
-    Stmt_Let *let;
-
-    consume(p, TOK_LET);
-
-    let = malloc(sizeof(Stmt_Let));
-    if (let == NULL) {
-        perror("parse_let");
+    lit = malloc(sizeof(Expr_Lit));
+    if (lit == NULL) {
+        perror("constant_expression");
         exit(1);
     }
 
-    meminit(&let->idents, sizeof(Token *), 16);
+    lit->value = p->tok;
+    advance(p);
 
-    for (;;) {
-        memgrow(&let->idents);
-        let->idents.buf[let->idents.len++] = p->tok;
-
-        consume(p, TOK_IDENT);
-
-        if (p->tok->kind != TOK_COMMA) {
-            break;
-        }
-
-        advance(p);
-    }
-
-    consume(p, TOK_SEMICOLON);
-
-    s->kind = STMT_LET;
-    s->body = let;
+    expr->kind = EXPR_CONST;
+    expr->body = lit;
 }
 
-static void parse_assign(Parser *p, Stmt *s)
+static void assign(Parser *p, Stmt *stmt)
 {
-    Stmt_Assign *assign;
-
-    assign = malloc(sizeof(Stmt_Assign));
+    Stmt_Assign *assign = malloc(sizeof(Stmt_Assign));
     if (assign == NULL) {
-        perror("parse_assign");
+        perror("assign");
         exit(1);
     }
 
@@ -157,43 +122,17 @@ static void parse_assign(Parser *p, Stmt *s)
     consume(p, TOK_IDENT);
     consume(p, TOK_EQ);
 
-    parse_expression(p, &assign->value);
+    expression(p, &assign->value);
 
     consume(p, TOK_SEMICOLON);
 
-    s->kind = STMT_ASSIGN;
-    s->body = assign;
+    stmt->kind = STMT_ASSIGN;
+    stmt->body = assign;
 }
 
-static void parse_proc(Parser *p, Stmt *s)
+static void _return(Parser *p, Stmt *stmt)
 {
-    Stmt_Proc *proc;
-
-    consume(p, TOK_PROC);
-
-    proc = malloc(sizeof(Stmt_Proc));
-    if (proc == NULL) {
-        perror("parse_proc");
-        exit(1);
-    }
-
-    proc->ident = p->tok;
-
-    consume(p, TOK_IDENT);
-    consume(p, TOK_LPAREN);
-    consume(p, TOK_RPAREN);
-
-    parse_block(p, &proc->body);
-
-    s->kind = STMT_PROC;
-    s->body = proc;
-}
-
-static void parse_ret(Parser *p, Stmt *s)
-{
-    Stmt_Ret *ret;
-
-    ret = malloc(sizeof(Stmt_Ret));
+    Stmt_Ret *ret = malloc(sizeof(Stmt_Ret));
     if (ret == NULL) {
         perror("parse_ret");
         exit(1);
@@ -204,42 +143,147 @@ static void parse_ret(Parser *p, Stmt *s)
     consume(p, TOK_RET);
     consume(p, TOK_SEMICOLON);
 
-    s->kind = STMT_RET;
-    s->body = ret;
+    stmt->kind = STMT_RET;
+    stmt->body = ret;
 }
 
-static void parse_statement(Parser *p, Stmt *s)
+static void block_variable(Parser *p, Decl *decl)
+{
+    Decl_Var *var = malloc(sizeof(Decl_Var));
+    if (var == NULL) {
+        perror("block_variable");
+        exit(1);
+    }
+
+    consume(p, TOK_LET);
+
+    var->ident = p->tok;
+
+    consume(p, TOK_IDENT);
+    consume(p, TOK_EQ);
+
+    expression(p, &var->value);
+
+    consume(p, TOK_SEMICOLON);
+
+    decl->kind = DECL_BLOCK_VAR;
+    decl->body = var;
+}
+
+static void block(Parser *p, Stmt *stmt)
+{
+    Stmt_Block *block = malloc(sizeof(Stmt_Block));
+    if (block == NULL) {
+        perror("parse_block");
+        exit(1);
+    }
+
+    consume(p, TOK_LCURLY);
+
+    meminit(&block->stmts, sizeof(Stmt), 64);
+    meminit(&block->decls, sizeof(Decl), 64);
+
+    while (p->tok->kind == TOK_LET) {
+        Decl *tmp = memnext(&block->decls);
+        block_variable(p, tmp);
+    }
+
+    while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
+        Stmt *tmp = memnext(&block->stmts);
+        statement(p, tmp);
+    }
+
+    consume(p, TOK_RCULRY);
+
+    stmt->kind = STMT_BLOCK;
+    stmt->body = block;
+}
+
+
+static void statement(Parser *p, Stmt *stmt)
 {
     switch (p->tok->kind) {
-    case TOK_LCURLY:
-        parse_block(p, s);
-        break;
-    case TOK_LET:
-        parse_let(p, s);
-        break;
     case TOK_IDENT:
-        parse_assign(p, s);
-        break;
-    case TOK_PROC:
-        parse_proc(p, s);
+        assign(p, stmt);
         break;
     case TOK_RET:
-        parse_ret(p, s);
+        _return(p, stmt);
         break;
-
+    case TOK_LCURLY:
+        block(p, stmt);
+        break;
     default:
         fprintf(stderr, "%s:%d: expected statement\n", p->s.filepath, p->tok->line);
         exit(1);
     }
 }
 
-void parse(Parser *p, Stmts *stmts)
+static void procedure(Parser *p, Decl *decl)
+{
+    Decl_Proc *proc = malloc(sizeof(Decl_Proc));
+    if (proc == NULL) {
+        perror("procedure");
+        exit(1);
+    }
+
+    consume(p, TOK_PROC);
+
+    proc->ident = p->tok;
+
+    consume(p, TOK_IDENT);
+    consume(p, TOK_LPAREN);
+    consume(p, TOK_RPAREN);
+
+    block(p, &proc->body);
+
+    decl->kind = DECL_PROC;
+    decl->body = proc;
+}
+
+static void file_variable(Parser *p, Decl *decl)
+{
+    Decl_Var *var = malloc(sizeof(Decl_Var));
+    if (var == NULL) {
+        perror("file_variable");
+        exit(1);
+    }
+
+    consume(p, TOK_LET);
+
+    var->ident = p->tok;
+
+    consume(p, TOK_IDENT);
+    consume(p, TOK_EQ);
+
+    constant_expression(p, &var->value);
+
+    consume(p, TOK_SEMICOLON);
+
+    decl->kind = DECL_FILE_VAR;
+    decl->body = var;
+}
+
+static void declaration(Parser *p, Decl *decl)
+{
+    switch (p->tok->kind) {
+    case TOK_LET:
+        file_variable(p, decl);
+        break;
+    case TOK_PROC:
+        procedure(p, decl);
+        break;
+    default:
+        fprintf(stderr, "%s:%d: expected declaration\n", p->s.filepath, p->tok->line);
+        exit(1);
+    }
+}
+
+void parse(Parser *p, Decls *decls)
 {
     while (p->tok->kind != TOK_EOF) {
-        Stmt *s;
+        Decl *d = memnext(decls);
 
-        s = memnext(stmts);
-        parse_statement(p, s);
+        declaration(p, d);
     }
 }
 

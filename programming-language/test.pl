@@ -1,10 +1,10 @@
+let file_a = 25;
+
 proc main() {
-    let a, b;
+    let block_a = 5;
+    let block_b = 8;
 
-    a = 5;
-    b = 8;
-
-    a = a + b;
+    block_a = file_a - (block_a + block_b);
 
     return;
 }
