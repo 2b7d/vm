@@ -8,7 +8,7 @@
  *
  * statement = assign|return|stmt_expr
  * assign    = ident "=" expression ";"
- * return    = "return" ";"
+ * return    = "return" expression? ";"
  * stmt_expr = expression ";"
  * block     = "{" statement* "}"
  * proc_bloc = "{" block_variable* statement* "}"
