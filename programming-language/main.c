@@ -195,7 +195,6 @@ void gen_expr(Expr *expr, Scope *scope, FILE *out)
         }
 
         fprintf(out, "push _rp ld\n");
-
         break;
     default:
         assert(0 && "unreachable");
@@ -261,7 +260,7 @@ void gen_stmt(Stmt *stmt, Scope *scope, FILE *out)
     case STMT_RET:
         ret = stmt->body;
 
-        if (ret->has_value) {
+        if (ret->has_value == 1) {
             gen_expr(&ret->value, scope, out);
         }
 
