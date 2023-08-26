@@ -11,7 +11,8 @@ typedef struct {
 typedef enum {
     EXPR_LIT = 0,
     EXPR_CONST,
-    EXPR_BINARY
+    EXPR_BINARY,
+    EXPR_CALL
 } Expr_Kind;
 
 typedef struct {
@@ -20,8 +21,20 @@ typedef struct {
 } Expr;
 
 typedef struct {
+    int len;
+    int cap;
+    int data_size;
+    Expr *buf;
+} Exprs;
+
+typedef struct {
     Token *value;
 } Expr_Lit;
+
+typedef struct {
+    Expr callee;
+    Exprs args;
+} Expr_Call;
 
 typedef struct {
     Expr x;
@@ -32,7 +45,9 @@ typedef struct {
 typedef enum {
     STMT_ASSIGN = 0,
     STMT_RET,
-    STMT_BLOCK
+    STMT_PROC_BLOCK,
+    STMT_BLOCK,
+    STMT_EXPR
 } Stmt_Kind;
 
 typedef struct {
@@ -54,7 +69,13 @@ typedef struct {
 
 typedef struct {
     Token *tok;
+    Expr value;
+    int has_value;
 } Stmt_Ret;
+
+typedef struct {
+    Expr expr;
+} Stmt_Expr;
 
 typedef enum {
     DECL_FILE_VAR = 0,
@@ -75,9 +96,13 @@ typedef struct {
 } Decls;
 
 typedef struct {
-    Decls decls;
     Stmts stmts;
 } Stmt_Block;
+
+typedef struct {
+    Decls decls;
+    Stmts stmts;
+} Stmt_Proc_Block;
 
 typedef struct {
     Token *ident;
@@ -86,6 +111,12 @@ typedef struct {
 
 typedef struct {
     Token *ident;
+    struct {
+        int len;
+        int cap;
+        int data_size;
+        Token **buf;
+    } params;
     Stmt body;
 } Decl_Proc;
 

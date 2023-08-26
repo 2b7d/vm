@@ -12,6 +12,7 @@ typedef enum {
     TOK_MINUS,
 
     TOK_SEMICOLON,
+    TOK_COMMA,
 
     TOK_LPAREN,
     TOK_RPAREN,

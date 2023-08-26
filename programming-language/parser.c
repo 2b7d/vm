@@ -60,9 +60,56 @@ static void primary(Parser *p, Expr *expr)
     expr->body = lit;
 }
 
+static void call(Parser *p, Expr *expr)
+{
+    Expr_Call *call;
+
+    primary(p, expr);
+
+    if (p->tok->kind != TOK_LPAREN) {
+        return;
+    }
+
+    advance(p);
+
+    call = malloc(sizeof(Expr_Call));
+    if (call == NULL) {
+        perror("call");
+        exit(1);
+    }
+
+    memcpy(&call->callee, expr, sizeof(Expr));
+    meminit(&call->args, sizeof(Expr), 256);
+
+    if (p->tok->kind != TOK_RPAREN) {
+        for (;;) {
+            Expr *arg;
+
+            if (call->args.len > 255) {
+                fprintf(stderr, "%s:%d: exceeded max number of arguments\n", p->s.filepath, p->tok->line);
+                exit(1);
+            }
+
+            arg = memnext(&call->args);
+            expression(p, arg);
+
+            if (p->tok->kind != TOK_COMMA) {
+                break;
+            }
+
+            advance(p);
+        }
+    }
+
+    consume(p, TOK_RPAREN);
+
+    expr->kind = EXPR_CALL;
+    expr->body = call;
+}
+
 static void term(Parser *p, Expr *expr)
 {
-    primary(p, expr);
+    call(p, expr);
 
     while (p->tok->kind == TOK_PLUS || p->tok->kind == TOK_MINUS) {
         Expr_Binary *binary = malloc(sizeof(Expr_Binary));
@@ -75,7 +122,7 @@ static void term(Parser *p, Expr *expr)
         binary->op = p->tok;
         advance(p);
 
-        primary(p, &binary->y);
+        call(p, &binary->y);
 
         expr->kind = EXPR_BINARY;
         expr->body = binary;
@@ -139,8 +186,15 @@ static void _return(Parser *p, Stmt *stmt)
     }
 
     ret->tok = p->tok;
+    ret->has_value = 0;
 
     consume(p, TOK_RET);
+
+    if (p->tok->kind != TOK_SEMICOLON) {
+        expression(p, &ret->value);
+        ret->has_value = 1;
+    }
+
     consume(p, TOK_SEMICOLON);
 
     stmt->kind = STMT_RET;
@@ -170,11 +224,11 @@ static void block_variable(Parser *p, Decl *decl)
     decl->body = var;
 }
 
-static void block(Parser *p, Stmt *stmt)
+static void proc_block(Parser *p, Stmt *stmt)
 {
-    Stmt_Block *block = malloc(sizeof(Stmt_Block));
+    Stmt_Proc_Block *block = malloc(sizeof(Stmt_Proc_Block));
     if (block == NULL) {
-        perror("parse_block");
+        perror("proc_block");
         exit(1);
     }
 
@@ -195,22 +249,62 @@ static void block(Parser *p, Stmt *stmt)
 
     consume(p, TOK_RCULRY);
 
-    stmt->kind = STMT_BLOCK;
+    stmt->kind = STMT_PROC_BLOCK;
     stmt->body = block;
 }
 
+
+//static void block(Parser *p, Stmt *stmt)
+//{
+//    Stmt_Block *block = malloc(sizeof(Stmt_Block));
+//    if (block == NULL) {
+//        perror("parse_block");
+//        exit(1);
+//    }
+
+//    consume(p, TOK_LCURLY);
+
+//    meminit(&block->stmts, sizeof(Stmt), 64);
+
+//    while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
+//        Stmt *tmp = memnext(&block->stmts);
+//        statement(p, tmp);
+//    }
+
+//    consume(p, TOK_RCULRY);
+
+//    stmt->kind = STMT_BLOCK;
+//    stmt->body = block;
+//}
+
+static void statement_expression(Parser *p, Stmt *stmt)
+{
+    Stmt_Expr *stmt_expr = malloc(sizeof(Stmt_Expr));
+    if (stmt_expr == NULL) {
+        perror("statement_expression");
+        exit(1);
+    }
+
+    expression(p, &stmt_expr->expr);
+
+    consume(p, TOK_SEMICOLON);
+
+    stmt->kind = STMT_EXPR;
+    stmt->body = stmt_expr;
+}
 
 static void statement(Parser *p, Stmt *stmt)
 {
     switch (p->tok->kind) {
     case TOK_IDENT:
-        assign(p, stmt);
+        if (p->toks.buf[p->cur + 1].kind == TOK_EQ) {
+            assign(p, stmt);
+        } else {
+            statement_expression(p, stmt);
+        }
         break;
     case TOK_RET:
         _return(p, stmt);
-        break;
-    case TOK_LCURLY:
-        block(p, stmt);
         break;
     default:
         fprintf(stderr, "%s:%d: expected statement\n", p->s.filepath, p->tok->line);
@@ -226,15 +320,40 @@ static void procedure(Parser *p, Decl *decl)
         exit(1);
     }
 
+    meminit(&proc->params, sizeof(Token *), 256);
+
     consume(p, TOK_PROC);
 
     proc->ident = p->tok;
 
     consume(p, TOK_IDENT);
     consume(p, TOK_LPAREN);
+
+    if (p->tok->kind != TOK_RPAREN) {
+        for (;;) {
+            Token **param;
+
+            if (proc->params.len > 255) {
+                fprintf(stderr, "%s:%d: exceeded max number of parameters\n", p->s.filepath, p->tok->line);
+                exit(1);
+            }
+
+            param = memnext(&proc->params);
+            *param = p->tok;
+
+            consume(p, TOK_IDENT);
+
+            if (p->tok->kind != TOK_COMMA) {
+                break;
+            }
+
+            advance(p);
+        }
+    }
+
     consume(p, TOK_RPAREN);
 
-    block(p, &proc->body);
+    proc_block(p, &proc->body);
 
     decl->kind = DECL_PROC;
     decl->body = proc;

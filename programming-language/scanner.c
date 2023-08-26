@@ -112,6 +112,11 @@ scan_again:
         make_token(s, tok, TOK_SEMICOLON);
         advance(s);
         break;
+    case ',':
+        make_token(s, tok, TOK_COMMA);
+        advance(s);
+        break;
+
     case '(':
         make_token(s, tok, TOK_LPAREN);
         advance(s);
@@ -197,7 +202,7 @@ char *tokstr(Token_Kind kind)
 		return "number";
 
     case TOK_EQ:
-		return "eq";
+		return "=";
 
     case TOK_PLUS:
 		return "+";
@@ -206,6 +211,8 @@ char *tokstr(Token_Kind kind)
 
     case TOK_SEMICOLON:
 		return ";";
+    case TOK_COMMA:
+		return ",";
 
     case TOK_LPAREN:
 		return "(";
