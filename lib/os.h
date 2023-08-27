@@ -1,1 +1,1 @@
-int read_file(char *filepath, char **buf);
+int os_read_file(char *filepath, char **buf);
