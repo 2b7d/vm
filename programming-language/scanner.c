@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "../lib/sstring.h"
 #include "../lib/mem.h"
@@ -10,31 +9,29 @@
 #include "scanner.h"
 
 typedef struct {
-    string s;
+    char *str;
+    int len;
     Token_Kind kind;
 } Kwd_Entry;
 
 static Kwd_Entry keywords[] = {
-    {.s = {.ptr = "let",    .len = 3}, .kind = TOK_LET},
-    {.s = {.ptr = "proc",   .len = 4}, .kind = TOK_PROC},
-    {.s = {.ptr = "return", .len = 6}, .kind = TOK_RET},
+    {.str = "let",    .len = 3, .kind = TOK_LET},
+    {.str = "proc",   .len = 4, .kind = TOK_PROC},
+    {.str = "return", .len = 6, .kind = TOK_RET},
+    {.str = "void",   .len = 4, .kind = TOK_VOID},
+    {.str = "u16",    .len = 3, .kind = TOK_U16},
+    {.str = "u8",     .len = 2, .kind = TOK_U8},
 
-    {.s = {.ptr = "", .len = 0}, .kind = TOK_ERR} // art: end of array
+    {.str = NULL, .len = 0, .kind = 0} // art: end of array
 };
-
-static void make_lexeme(Scanner *s, string *buf)
-{
-    string_make(buf, s->src + s->pos, s->cur - s->pos);
-}
 
 static Token_Kind lookup_keyword(Scanner *s)
 {
-    string ident;
+    char *str = s->src + s->start;
+    int len = s->cur - s->start;
 
-    make_lexeme(s, &ident);
-
-    for (Kwd_Entry *e = keywords; e->kind != TOK_ERR; ++e) {
-        if (string_cmp(&ident, &e->s) == 1) {
+    for (Kwd_Entry *e = keywords; e->str != NULL; ++e) {
+        if (len == e->len && memcmp(str, e->str, len) == 0) {
             return e->kind;
         }
     }
@@ -52,10 +49,44 @@ static void advance(Scanner *s)
     s->ch = s->src[s->cur];
 }
 
-static void make_token(Scanner *s, Token *tok, Token_Kind kind)
+static int next(Scanner *s, char c)
+{
+    if (s->ch == '\0') {
+        return 0;
+    }
+
+    return s->src[s->cur + 1] == c;
+}
+
+static void make_pos(Scanner *s, Token *tok)
+{
+    tok->pos.file = s->file;
+    tok->pos.line = s->line;
+}
+
+static void make_lex(Scanner *s, Token *tok)
+{
+    string_make(&tok->lex, s->src + s->start, s->cur - s->start);
+}
+
+static void make_num(Token *tok)
+{
+    char *lex = string_toc(&tok->lex);
+
+    // TODO(art): handle convert errors
+    tok->value.as_num = atoi(lex);
+    free(lex);
+}
+
+static void make_tok(Scanner *s, Token *tok, Token_Kind kind)
 {
     tok->kind = kind;
-    tok->line = s->line;
+    make_pos(s, tok);
+    make_lex(s, tok);
+
+    if (tok->kind == TOK_NUM) {
+        make_num(tok);
+    }
 }
 
 static int is_char(char c)
@@ -76,12 +107,12 @@ static int is_alnum(char c)
 static void scan(Scanner *s, Token *tok)
 {
 scan_again:
+    s->start = s->cur;
+
     if (s->ch == '\0') {
-        make_token(s, tok, TOK_EOF);
+        make_tok(s, tok, TOK_EOF);
         return;
     }
-
-    s->pos = s->cur;
 
     switch (s->ch) {
     case ' ':
@@ -95,43 +126,56 @@ scan_again:
         goto scan_again;
 
     case '=':
-        make_token(s, tok, TOK_EQ);
         advance(s);
+        make_tok(s, tok, TOK_EQ);
         break;
 
     case '+':
-        make_token(s, tok, TOK_PLUS);
         advance(s);
+        make_tok(s, tok, TOK_PLUS);
         break;
     case '-':
-        make_token(s, tok, TOK_MINUS);
         advance(s);
+        make_tok(s, tok, TOK_MINUS);
         break;
+    case '/':
+        if (next(s, '/') == 1) {
+            while (s->ch != '\n' && s->ch != '\0') {
+                advance(s);
+            }
+            goto scan_again;
+        }
+        fprintf(stderr, "%s:%d: unexpected character %c\n", s->file, s->line, s->ch);
+        exit(1);
 
-    case ';':
-        make_token(s, tok, TOK_SEMICOLON);
-        advance(s);
-        break;
     case ',':
-        make_token(s, tok, TOK_COMMA);
         advance(s);
+        make_tok(s, tok, TOK_COMMA);
+        break;
+    case ':':
+        advance(s);
+        make_tok(s, tok, TOK_COLON);
+        break;
+    case ';':
+        advance(s);
+        make_tok(s, tok, TOK_SEMICOLON);
         break;
 
     case '(':
-        make_token(s, tok, TOK_LPAREN);
         advance(s);
+        make_tok(s, tok, TOK_LPAREN);
         break;
     case ')':
-        make_token(s, tok, TOK_RPAREN);
         advance(s);
+        make_tok(s, tok, TOK_RPAREN);
         break;
     case '{':
-        make_token(s, tok, TOK_LCURLY);
         advance(s);
+        make_tok(s, tok, TOK_LCURLY);
         break;
     case '}':
-        make_token(s, tok, TOK_RCULRY);
         advance(s);
+        make_tok(s, tok, TOK_RCULRY);
         break;
 
     default:
@@ -143,29 +187,26 @@ scan_again:
             }
 
             kind = lookup_keyword(s);
-            make_token(s, tok, kind);
-            if (kind == TOK_IDENT) {
-                make_lexeme(s, &tok->lex);
-            }
+            make_tok(s, tok, kind);
         } else if (is_digit(s->ch) == 1) {
             while (is_digit(s->ch) == 1) {
                 advance(s);
             }
-            make_token(s, tok, TOK_NUM);
-            make_lexeme(s, &tok->lex);
+            make_tok(s, tok, TOK_NUM);
         } else {
-            fprintf(stderr, "%s:%d: unexpected character %c\n", s->filepath, s->line, s->ch);
+            fprintf(stderr, "%s:%d: unexpected character %c\n", s->file, s->line, s->ch);
             exit(1);
         }
     };
 }
 
-void scan_tokens(Scanner *s, Tokens *toks)
+void scanner_scan(Scanner *s, Tokens *toks)
 {
     Token *tok;
 
     for (;;) {
-        tok = memnext(toks);
+        mem_grow(toks);
+        tok = mem_next(toks);
         memset(tok, 0, sizeof(Token));
 
         scan(s, tok);
@@ -176,26 +217,33 @@ void scan_tokens(Scanner *s, Tokens *toks)
     }
 }
 
-void make_scanner(Scanner *s, char *filepath)
+void scanner_make(Scanner *s, char *file)
 {
-    if (read_file(filepath, &s->src) < 0) {
+    if (os_read_file(file, &s->src) < 0) {
         perror(NULL);
         exit(1);
     }
 
-    s->filepath = filepath;
+    s->file = file;
     s->cur = 0;
-    s->pos = 0;
+    s->start = 0;
     s->line = 1;
     s->ch = s->src[0];
 }
 
-char *tokstr(Token_Kind kind)
+int scanner_is_type(Token_Kind kind)
+{
+    return kind > TOK_type_begin && kind < TOK_type_end;
+}
+
+int scanner_is_numtype(Token_Kind kind)
+{
+    return kind > TOK_numtype_begin && kind < TOK_numtype_end;
+}
+
+char *scanner_tokstr(Token_Kind kind)
 {
     switch (kind) {
-    case TOK_ERR:
-		return "<error>";
-
     case TOK_IDENT:
 		return "identifier";
     case TOK_NUM:
@@ -209,10 +257,12 @@ char *tokstr(Token_Kind kind)
     case TOK_MINUS:
 		return "-";
 
-    case TOK_SEMICOLON:
-		return ";";
     case TOK_COMMA:
 		return ",";
+    case TOK_COLON:
+        return ":";
+    case TOK_SEMICOLON:
+		return ";";
 
     case TOK_LPAREN:
 		return "(";
@@ -230,9 +280,18 @@ char *tokstr(Token_Kind kind)
     case TOK_RET:
 		return "return";
 
+    case TOK_VOID:
+        return "void";
+    case TOK_U16:
+        return "u16";
+    case TOK_U8:
+        return "u8";
+
     case TOK_EOF:
 		return "<end of file>";
+
     default:
-        assert(0 && "unreachable");
+        fprintf(stderr, "unexpected token kind %d\n", kind);
+        exit(1);
     }
 }

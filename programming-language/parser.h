@@ -2,7 +2,6 @@
 // #include "scanner.h"
 
 typedef struct {
-    Scanner s;
     Tokens toks;
     Token *tok;
     int cur;
@@ -23,7 +22,6 @@ typedef struct {
 typedef struct {
     int len;
     int cap;
-    int data_size;
     Expr *buf;
 } Exprs;
 
@@ -58,7 +56,6 @@ typedef struct {
 typedef struct {
     int len;
     int cap;
-    int data_size;
     Stmt *buf;
 } Stmts;
 
@@ -78,8 +75,7 @@ typedef struct {
 } Stmt_Expr;
 
 typedef enum {
-    DECL_FILE_VAR = 0,
-    DECL_BLOCK_VAR,
+    DECL_VAR = 0,
     DECL_PROC
 } Decl_Kind;
 
@@ -91,7 +87,6 @@ typedef struct {
 typedef struct {
     int len;
     int cap;
-    int data_size;
     Decl *buf;
 } Decls;
 
@@ -106,19 +101,25 @@ typedef struct {
 
 typedef struct {
     Token *ident;
+    Token *type;
     Expr value;
 } Decl_Var;
 
 typedef struct {
     Token *ident;
+    Token *type;
+} Proc_Param;
+
+typedef struct {
+    Token *ident;
+    Token *ret_type;
     struct {
         int len;
         int cap;
-        int data_size;
-        Token **buf;
+        Proc_Param *buf;
     } params;
     Stmt body;
 } Decl_Proc;
 
-void make_parser(Parser *p, char *filepath);
-void parse(Parser *p, Decls *decls);
+void parser_make(Parser *p, Scanner *s);
+void parser_parse(Parser *p, Decls *decls);

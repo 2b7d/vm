@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../lib/mem.h"
 #include "../lib/sstring.h"
@@ -21,10 +21,29 @@ static void advance(Parser *p)
     p->tok = p->toks.buf + p->cur;
 }
 
+static int next(Parser *p, Token_Kind kind)
+{
+    if (p->tok->kind == TOK_EOF) {
+        return 0;
+    }
+
+    return p->toks.buf[p->cur + 1].kind == kind;
+}
+
 static void consume(Parser *p, Token_Kind kind)
 {
     if (p->tok->kind != kind) {
-        fprintf(stderr, "%s:%d: expected %s but got %s\n", p->s.filepath, p->tok->line, tokstr(kind), tokstr(p->tok->kind));
+        fprintf(stderr, "%s:%d: expected %s but got %s\n", p->tok->pos.file, p->tok->pos.line, scanner_tokstr(kind), scanner_tokstr(p->tok->kind));
+        exit(1);
+    }
+
+    advance(p);
+}
+
+static void consume_type(Parser *p)
+{
+    if (scanner_is_type(p->tok->kind) == 0) {
+        fprintf(stderr, "%s:%d: expected type but got %s\n", p->tok->pos.file, p->tok->pos.line, scanner_tokstr(p->tok->kind));
         exit(1);
     }
 
@@ -43,7 +62,7 @@ static void primary(Parser *p, Expr *expr)
     }
 
     if (p->tok->kind != TOK_IDENT && p->tok->kind != TOK_NUM) {
-        fprintf(stderr, "%s:%d: expected number or identifier but got %s\n", p->s.filepath, p->tok->line, tokstr(p->tok->kind));
+        fprintf(stderr, "%s:%d: expected number or identifier but got %s\n", p->tok->pos.file, p->tok->pos.line, scanner_tokstr(p->tok->kind));
         exit(1);
     }
 
@@ -79,18 +98,19 @@ static void call(Parser *p, Expr *expr)
     }
 
     memcpy(&call->callee, expr, sizeof(Expr));
-    meminit(&call->args, sizeof(Expr), 256);
+    mem_make(&call->args, 256);
 
     if (p->tok->kind != TOK_RPAREN) {
         for (;;) {
             Expr *arg;
 
             if (call->args.len > 255) {
-                fprintf(stderr, "%s:%d: exceeded max number of arguments\n", p->s.filepath, p->tok->line);
+                fprintf(stderr, "%s:%d: exceeded max number of arguments\n", p->tok->pos.file, p->tok->pos.line);
                 exit(1);
             }
 
-            arg = memnext(&call->args);
+            mem_grow(&call->args);
+            arg = mem_next(&call->args);
             expression(p, arg);
 
             if (p->tok->kind != TOK_COMMA) {
@@ -139,7 +159,7 @@ static void constant_expression(Parser *p, Expr *expr)
     Expr_Lit *lit;
 
     if (p->tok->kind != TOK_NUM) {
-        fprintf(stderr, "%s:%d: expected constant expression\n", p->s.filepath, p->tok->line);
+        fprintf(stderr, "%s:%d: expected constant expression\n", p->tok->pos.file, p->tok->pos.line);
         exit(1);
     }
 
@@ -201,11 +221,11 @@ static void _return(Parser *p, Stmt *stmt)
     stmt->body = ret;
 }
 
-static void block_variable(Parser *p, Decl *decl)
+static Decl_Var *variable(Parser *p)
 {
     Decl_Var *var = malloc(sizeof(Decl_Var));
     if (var == NULL) {
-        perror("block_variable");
+        perror("variable");
         exit(1);
     }
 
@@ -214,13 +234,25 @@ static void block_variable(Parser *p, Decl *decl)
     var->ident = p->tok;
 
     consume(p, TOK_IDENT);
+    consume(p, TOK_COLON);
+
+    var->type = p->tok;
+
+    consume_type(p);
     consume(p, TOK_EQ);
 
-    expression(p, &var->value);
+    return var;
+}
 
+static void block_variable(Parser *p, Decl *decl)
+{
+
+    Decl_Var *var = variable(p);
+
+    expression(p, &var->value);
     consume(p, TOK_SEMICOLON);
 
-    decl->kind = DECL_BLOCK_VAR;
+    decl->kind = DECL_VAR;
     decl->body = var;
 }
 
@@ -234,16 +266,22 @@ static void proc_block(Parser *p, Stmt *stmt)
 
     consume(p, TOK_LCURLY);
 
-    meminit(&block->stmts, sizeof(Stmt), 64);
-    meminit(&block->decls, sizeof(Decl), 64);
+    mem_make(&block->stmts, 64);
+    mem_make(&block->decls, 64);
 
     while (p->tok->kind == TOK_LET) {
-        Decl *tmp = memnext(&block->decls);
+        Decl *tmp;
+
+        mem_grow(&block->decls);
+        tmp = mem_next(&block->decls);
         block_variable(p, tmp);
     }
 
     while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
-        Stmt *tmp = memnext(&block->stmts);
+        Stmt *tmp;
+
+        mem_grow(&block->stmts);
+        tmp = mem_next(&block->stmts);
         statement(p, tmp);
     }
 
@@ -252,7 +290,6 @@ static void proc_block(Parser *p, Stmt *stmt)
     stmt->kind = STMT_PROC_BLOCK;
     stmt->body = block;
 }
-
 
 //static void block(Parser *p, Stmt *stmt)
 //{
@@ -297,7 +334,7 @@ static void statement(Parser *p, Stmt *stmt)
 {
     switch (p->tok->kind) {
     case TOK_IDENT:
-        if (p->toks.buf[p->cur + 1].kind == TOK_EQ) {
+        if (next(p, TOK_EQ) == 1) {
             assign(p, stmt);
         } else {
             statement_expression(p, stmt);
@@ -307,9 +344,20 @@ static void statement(Parser *p, Stmt *stmt)
         _return(p, stmt);
         break;
     default:
-        fprintf(stderr, "%s:%d: expected statement\n", p->s.filepath, p->tok->line);
+        fprintf(stderr, "%s:%d: expected statement\n", p->tok->pos.file, p->tok->pos.line);
         exit(1);
     }
+}
+
+static void file_variable(Parser *p, Decl *decl)
+{
+    Decl_Var *var = variable(p);
+
+    constant_expression(p, &var->value);
+    consume(p, TOK_SEMICOLON);
+
+    decl->kind = DECL_VAR;
+    decl->body = var;
 }
 
 static void procedure(Parser *p, Decl *decl)
@@ -319,8 +367,7 @@ static void procedure(Parser *p, Decl *decl)
         perror("procedure");
         exit(1);
     }
-
-    meminit(&proc->params, sizeof(Token *), 256);
+    mem_make(&proc->params, 256);
 
     consume(p, TOK_PROC);
 
@@ -331,17 +378,23 @@ static void procedure(Parser *p, Decl *decl)
 
     if (p->tok->kind != TOK_RPAREN) {
         for (;;) {
-            Token **param;
+            Proc_Param *param;
 
             if (proc->params.len > 255) {
-                fprintf(stderr, "%s:%d: exceeded max number of parameters\n", p->s.filepath, p->tok->line);
+                fprintf(stderr, "%s:%d: exceeded max number of parameters\n", p->tok->pos.file, p->tok->pos.line);
                 exit(1);
             }
 
-            param = memnext(&proc->params);
-            *param = p->tok;
+            mem_grow(&proc->params);
+            param = mem_next(&proc->params);
 
+            param->ident = p->tok;
             consume(p, TOK_IDENT);
+
+            consume(p, TOK_COLON);
+
+            param->type = p->tok;
+            consume_type(p);
 
             if (p->tok->kind != TOK_COMMA) {
                 break;
@@ -352,6 +405,10 @@ static void procedure(Parser *p, Decl *decl)
     }
 
     consume(p, TOK_RPAREN);
+    consume(p, TOK_COLON);
+
+    proc->ret_type = p->tok;
+    consume_type(p);
 
     proc_block(p, &proc->body);
 
@@ -359,60 +416,39 @@ static void procedure(Parser *p, Decl *decl)
     decl->body = proc;
 }
 
-static void file_variable(Parser *p, Decl *decl)
-{
-    Decl_Var *var = malloc(sizeof(Decl_Var));
-    if (var == NULL) {
-        perror("file_variable");
-        exit(1);
-    }
-
-    consume(p, TOK_LET);
-
-    var->ident = p->tok;
-
-    consume(p, TOK_IDENT);
-    consume(p, TOK_EQ);
-
-    constant_expression(p, &var->value);
-
-    consume(p, TOK_SEMICOLON);
-
-    decl->kind = DECL_FILE_VAR;
-    decl->body = var;
-}
-
 static void declaration(Parser *p, Decl *decl)
 {
     switch (p->tok->kind) {
-    case TOK_LET:
-        file_variable(p, decl);
-        break;
     case TOK_PROC:
         procedure(p, decl);
         break;
+    case TOK_LET:
+        file_variable(p, decl);
+        break;
     default:
-        fprintf(stderr, "%s:%d: expected declaration\n", p->s.filepath, p->tok->line);
+        fprintf(stderr, "%s:%d: expected declaration\n", p->tok->pos.file, p->tok->pos.line);
         exit(1);
     }
 }
 
-void parse(Parser *p, Decls *decls)
+void parser_parse(Parser *p, Decls *decls)
 {
+    Decl *d;
+
     while (p->tok->kind != TOK_EOF) {
-        Decl *d = memnext(decls);
+        mem_grow(decls);
+        d = mem_next(decls);
 
         declaration(p, d);
     }
 }
 
-void make_parser(Parser *p, char *filepath)
+void parser_make(Parser *p, Scanner *s)
 {
-    meminit(&p->toks, sizeof(Token), 128);
+    mem_make(&p->toks, 256);
 
-    make_scanner(&p->s, filepath);
-    scan_tokens(&p->s, &p->toks);
+    scanner_scan(s, &p->toks);
 
-    p->cur = 0;
     p->tok = p->toks.buf;
+    p->cur = 0;
 }

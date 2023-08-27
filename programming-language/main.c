@@ -2,9 +2,13 @@
  * program = declaration* EOF
  *
  * declaration    = procedure|file_variable
- * procedure      = "proc" ident "(" (ident ("," ident)*)? ")" proc_block
- * file_variable  = "let" ident "=" number ";"
- * block_variable = "let" ident "=" expression ";"
+ * procedure      = "proc" ident "(" params? ")" ":" type proc_block
+ * file_variable  = variable number ";"
+ * block_variable = variable expression ";"
+ *
+ * variable = "let" ident ":" type "="
+ * params   = ident ":" type ("," ident ":" type)*
+ * type     = "u16"|"void"
  *
  * statement = assign|return|stmt_expr
  * assign    = ident "=" expression ";"
@@ -14,9 +18,11 @@
  * proc_bloc = "{" block_variable* statement* "}"
  *
  * expression = term
- * term = call (("+"|"-") call)*
- * call = primary ("("(expression ("," expression)*)?")")?
- * primary = ident|number|"(" expression ")"
+ * term       = call (("+"|"-") call)*
+ * call       = primary ("(" args? ")")?
+ * primary    = ident|number|"(" expression ")"
+ *
+ * args      = expression ("," expression)*
  *
  * ident  = char (char|digit)
  * number = digit+
@@ -29,286 +35,251 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "../lib/sstring.h"
 #include "../lib/mem.h"
-#include "../lib/path.h"
+#include "../lib/sstring.h"
 
 #include "scanner.h"
+#include "symtab.h"
 #include "parser.h"
 
-typedef enum {
-    SYM_FILE = 0,
-    SYM_PROC,
-    SYM_BLOCK,
-    SYM_ARG
-} Symbol_Kind;
-
-typedef struct {
-    string name;
-    int offset;
-    Symbol_Kind kind;
-} Symbol;
-
-typedef struct scope {
-    struct {
-        int len;
-        int cap;
-        int data_size;
-        Symbol *buf;
-    } symtab;
-
-    int offset;
-    int arg_offset;
-
-    struct scope *prev;
-} Scope;
-
-void gen_decl(Decl *decl, Scope *scope, FILE *out);
-
-void scope_make(Scope *new, Scope *prev)
+Token_Kind check_expr(Expr *expr, int block_idx, Symtab *st)
 {
-    meminit(&new->symtab, sizeof(Symbol), 128);
-
-    new->prev = prev;
-    new->offset = 1;
-    new->arg_offset = 1;
-}
-
-void scope_declare_var(Scope *s, string *name, Symbol_Kind kind)
-{
-    Symbol *sym = memnext(&s->symtab);
-    int offset = -1;
-
-    if (kind == SYM_BLOCK) {
-        offset = s->offset;
-        s->offset++;
-    } else if (kind == SYM_ARG) {
-        offset = s->arg_offset;
-        s->arg_offset++;
-    }
-
-    sym->offset = offset;
-    sym->kind = kind;
-    string_dup(&sym->name, name);
-}
-
-Symbol *scope_lookup_var(Scope *s, string *name)
-{
-    while (s != NULL) {
-        for (int i = 0; i < s->symtab.len; ++i) {
-            Symbol *sym = s->symtab.buf + i;
-
-            if (string_cmp(&sym->name, name) == 1) {
-                return sym;
-            }
-        }
-
-        s = s->prev;
-    }
-
-    return NULL;
-}
-
-void gen_expr(Expr *expr, Scope *scope, FILE *out)
-{
+    Token_Kind type_x, type_y;
     Expr_Binary *binary;
     Expr_Call *call;
     Expr_Lit *lit;
     Symbol *sym;
-    char *lex;
 
     switch (expr->kind) {
     case EXPR_CONST:
-        lit = expr->body;
-
-        assert(lit->value->kind == TOK_NUM);
-
-        lex = string_toc(&lit->value->lex);
-        fprintf(out, ".word %d\n", atoi(lex));
-        free(lex);
-        break;
     case EXPR_LIT:
         lit = expr->body;
 
         switch (lit->value->kind) {
         case TOK_NUM:
-            lex = string_toc(&lit->value->lex);
-            fprintf(out, "push %d\n", atoi(lex));
-            free(lex);
-            break;
+            return TOK_NUM;
         case TOK_IDENT:
-            sym = scope_lookup_var(scope, &lit->value->lex);
-            assert(sym != NULL);
-
-            switch (sym->kind) {
-            case SYM_FILE:
-                fprintf(out, "push %.*s ld\n", sym->name.len, sym->name.ptr);
-                break;
-            case SYM_BLOCK:
-                fprintf(out, "push _fp ld push %d add ld\n", sym->offset * 2);
-                break;
-            case SYM_ARG:
-                fprintf(out, "push _fp ld push %d sub ld\n", sym->offset * 2 + 2);
-                break;
-            case SYM_PROC:
-                fprintf(out, "call %.*s\n", sym->name.len, sym->name.ptr);
-                break;
-            default:
-                assert(0 && "unreachable");
+            sym = symtab_full_lookup(st, &lit->value->lex, block_idx);
+            if (sym == NULL) {
+                fprintf(stderr, "%s:%d: symbol %.*s does not exist\n", lit->value->pos.file, lit->value->pos.line, lit->value->lex.len, lit->value->lex.ptr);
+                exit(1);
             }
-            break;
+            if (sym->kind == SYM_PROC) {
+                fprintf(stderr, "%s:%d: proc pointers are not supported yet\n", lit->value->pos.file, lit->value->pos.line);
+                exit(1);
+            }
+            return sym->type;
         default:
             assert(0 && "unreachable");
         }
-
-        break;
     case EXPR_BINARY:
         binary = expr->body;
 
-        gen_expr(&binary->x, scope, out);
-        gen_expr(&binary->y, scope, out);
+        type_x = check_expr(&binary->x, block_idx, st);
+        type_y = check_expr(&binary->y, block_idx, st);
+
+        if (type_x == TOK_NUM && type_y == TOK_NUM) {
+            return TOK_NUM;
+        } else if (type_x == TOK_NUM) {
+            type_x = type_y;
+        } else if (type_y == TOK_NUM) {
+            type_y = type_x;
+        }
 
         switch (binary->op->kind) {
         case TOK_PLUS:
-            fprintf(out, "add\n");
-            break;
         case TOK_MINUS:
-            fprintf(out, "sub\n");
-            break;
-        default:
-            assert(0 && "unreachable");
-        }
-
-        break;
-    case EXPR_CALL:
-        call = expr->body;
-
-        for (int i = 0; i < call->args.len; ++i) {
-            Expr *arg = call->args.buf + i;
-            gen_expr(arg, scope, out);
-        }
-
-        gen_expr(&call->callee, scope, out);
-
-        for (int i = 0; i < call->args.len; ++i) {
-            fprintf(out, "drop\n");
-        }
-
-        fprintf(out, "push _rp ld\n");
-        break;
-    default:
-        assert(0 && "unreachable");
-    }
-}
-
-void gen_stmt(Stmt *stmt, Scope *scope, FILE *out)
-{
-    Stmt_Proc_Block *proc_block;
-    Stmt_Expr *stmt_expr;
-    Stmt_Assign *assign;
-    Stmt_Block *block;
-    Stmt_Ret *ret;
-    Symbol *sym;
-
-    switch (stmt->kind) {
-    case STMT_PROC_BLOCK:
-        proc_block = stmt->body;
-
-        for (int i = 0; i < proc_block->decls.len; ++i) {
-            Decl *tmp = proc_block->decls.buf + i;
-            gen_decl(tmp, scope, out);
-        }
-
-        for (int i = 0; i < proc_block->stmts.len; ++i) {
-            Stmt *tmp = proc_block->stmts.buf + i;
-            gen_stmt(tmp, scope, out);
-        }
-
-        break;
-    case STMT_BLOCK:
-        block = stmt->body;
-
-        for (int i = 0; i < block->stmts.len; ++i) {
-            Stmt *tmp = block->stmts.buf + i;
-            gen_stmt(tmp, scope, out);
-        }
-
-        break;
-    case STMT_ASSIGN:
-        assign = stmt->body;
-
-        sym = scope_lookup_var(scope, &assign->ident->lex);
-        gen_expr(&assign->value, scope, out);
-
-        switch (sym->kind) {
-        case SYM_FILE:
-            fprintf(out, "push %.*s st\n", sym->name.len, sym->name.ptr);
-            break;
-        case SYM_BLOCK:
-            fprintf(out, "push _fp ld push %d add st\n", sym->offset * 2);
-            break;
-        case SYM_ARG:
-            fprintf(out, "push _fp ld push %d sub st\n", sym->offset * 2 + 2);
-            break;
-        case SYM_PROC:
-            fprintf(stderr, "can not reassign procedure\n");
+            if (scanner_is_numtype(type_x) == 1 &&
+                    scanner_is_numtype(type_y) == 1 &&
+                    type_x == type_y) {
+                return type_x;
+            }
+            fprintf(stderr, "%s:%d: unexpected types %s, %s for %s operator\n", binary->op->pos.file, binary->op->pos.line, scanner_tokstr(type_x), scanner_tokstr(type_y), scanner_tokstr(binary->op->kind));
             exit(1);
         default:
             assert(0 && "unreachable");
         }
-        break;
-    case STMT_RET:
-        ret = stmt->body;
+    case EXPR_CALL:
+        call = expr->body;
+        lit = call->callee.body;
 
-        if (ret->has_value == 1) {
-            gen_expr(&ret->value, scope, out);
+        sym = symtab_full_lookup(st, &lit->value->lex, block_idx);
+        if (sym == NULL) {
+            fprintf(stderr, "%s:%d: symbol %.*s does not exist\n", lit->value->pos.file, lit->value->pos.line, lit->value->lex.len, lit->value->lex.ptr);
+            exit(1);
+        }
+        if (sym->kind == SYM_VAR) {
+            fprintf(stderr, "%s:%d: attempted to call a var\n", lit->value->pos.file, lit->value->pos.line);
+            exit(1);
         }
 
-        fprintf(out, "ret\n");
-        break;
-    case STMT_EXPR:
-        stmt_expr = stmt->body;
-        gen_expr(&stmt_expr->expr, scope, out);
-        break;
+        if (call->args.len != sym->params.len) {
+            fprintf(stderr, "%s:%d: expected %d amount of args but got %d\n", lit->value->pos.file, lit->value->pos.line, sym->params.len, call->args.len);
+            exit(1);
+        }
+
+        for (int i = 0; i < sym->params.len; ++i) {
+            type_x = sym->params.buf[i];
+            type_y = check_expr(call->args.buf + i, block_idx, st);
+
+            if (type_y == TOK_NUM && scanner_is_numtype(type_x) == 1) {
+                type_y = type_x;
+            }
+
+            if (type_x != type_y) {
+                fprintf(stderr, "%s:%d: expected type %s of arg %d but got %s\n", lit->value->pos.file, lit->value->pos.line, scanner_tokstr(type_x), i + 1, scanner_tokstr(type_y));
+                exit(1);
+            }
+        }
+
+        return sym->ret_type;
     default:
         assert(0 && "unreachable");
     }
 }
 
-void gen_decl(Decl *decl, Scope *scope, FILE *out)
+void check_stmt(Stmt *stmt, Symbol *block, Symtab *st)
 {
-    Decl_Var *var;
-    Decl_Proc *proc;
-    Scope new_scope;
+    Stmt_Expr *stmt_expr;
+    Stmt_Assign *assign;
+    Stmt_Ret *ret;
+    Symbol *sym;
+    Token_Kind type;
 
-    switch (decl->kind) {
-    case DECL_FILE_VAR:
-        var = decl->body;
+    switch (stmt->kind) {
+    case STMT_ASSIGN:
+        assign = stmt->body;
 
-        scope_declare_var(scope, &var->ident->lex, SYM_FILE);
-        fprintf(out, "%.*s:", var->ident->lex.len, var->ident->lex.ptr);
-        gen_expr(&var->value, scope, out);
-        break;
-    case DECL_BLOCK_VAR:
-        var = decl->body;
-
-        scope_declare_var(scope, &var->ident->lex, SYM_BLOCK);
-        gen_expr(&var->value, scope, out);
-        break;
-    case DECL_PROC:
-        proc = decl->body;
-
-        scope_declare_var(scope, &proc->ident->lex, SYM_PROC);
-        fprintf(out, "%.*s:\n", proc->ident->lex.len, proc->ident->lex.ptr);
-
-        scope_make(&new_scope, scope);
-
-        for (int i = 0; i < proc->params.len; ++i) {
-            Token *arg = proc->params.buf[i];
-            scope_declare_var(&new_scope, &arg->lex, SYM_ARG);
+        sym = symtab_full_lookup(st, &assign->ident->lex, block->idx);
+        if (sym == NULL) {
+            fprintf(stderr, "%s:%d: symbol %.*s does not exist\n", assign->ident->pos.file, assign->ident->pos.line, assign->ident->lex.len, assign->ident->lex.ptr);
+            exit(1);
         }
 
-        gen_stmt(&proc->body, &new_scope, out);
+        if (sym->kind == SYM_PROC) {
+            fprintf(stderr, "%s:%d: can not reassign procs\n", assign->ident->pos.file, assign->ident->pos.line);
+            exit(1);
+        }
+
+        type = check_expr(&assign->value, block->idx, st);
+        if (sym->type != type) {
+            fprintf(stderr, "%s:%d: assigning type %s to %s\n", assign->ident->pos.file, assign->ident->pos.line, scanner_tokstr(type), scanner_tokstr(sym->type));
+            exit(1);
+        }
+		break;
+    case STMT_RET:
+        ret = stmt->body;
+
+        if (ret->has_value == 1 && block->ret_type == TOK_VOID) {
+            fprintf(stderr, "%s:%d: expected type void\n", ret->tok->pos.file, ret->tok->pos.line);
+            exit(1);
+        }
+
+        if (ret->has_value == 1) {
+            type = check_expr(&ret->value, block->idx, st);
+            if (block->ret_type != type) {
+                fprintf(stderr, "%s:%d: expected type %s but got %s\n", ret->tok->pos.file, ret->tok->pos.line, scanner_tokstr(block->ret_type), scanner_tokstr(type));
+                exit(1);
+            }
+        }
+		break;
+    case STMT_EXPR:
+        stmt_expr = stmt->body;
+        check_expr(&stmt_expr->expr, block->idx, st);
+		break;
+
+    case STMT_BLOCK:
+        assert(0 && "check_stmt STMT_BLOCK: not implemented");
+    case STMT_PROC_BLOCK:
+        assert(0 && "check_stmt STMT_PROC_BLOCK: should not get there");
+    default:
+        assert(0 && "unreachable");
+    }
+}
+
+void check_var(Decl_Var *var, int block_idx, Symtab *st)
+{
+    Token_Kind type;
+    Symbol *var_sym;
+    Symbol_Scope scope = SCOPE_BLOCK;
+
+    if (block_idx == -1) {
+        scope = SCOPE_FILE;
+    }
+
+    var_sym = symtab_insert_var(st, &var->ident->lex, block_idx, scope,
+                                var->type->kind);
+    if (var_sym == NULL) {
+        fprintf(stderr, "%s:%d: var %.*s already defined\n", var->ident->pos.file, var->ident->pos.line, var->ident->lex.len, var->ident->lex.ptr);
+        exit(1);
+    }
+
+    if (var_sym->type == TOK_VOID) {
+        fprintf(stderr, "%s:%d: can not use void for var\n", var->ident->pos.file, var->ident->pos.line);
+        exit(1);
+    }
+
+    type = check_expr(&var->value, block_idx, st);
+    if (type == TOK_NUM) {
+        type = var->type->kind;
+    }
+
+    if (var->type->kind != type) {
+        fprintf(stderr, "%s:%d: expected type %s but got %s\n", var->ident->pos.file, var->ident->pos.line, scanner_tokstr(var->type->kind), scanner_tokstr(type));
+        exit(1);
+    }
+}
+
+void check_proc(Decl_Proc *proc, Symtab *st)
+{
+    Stmt_Proc_Block *block = proc->body.body;
+    Symbol *proc_sym = symtab_insert_proc(st, &proc->ident->lex,
+                                          proc->ret_type->kind);
+
+    if (proc_sym == NULL) {
+        fprintf(stderr, "%s:%d: proc %.*s already defined\n", proc->ident->pos.file, proc->ident->pos.line, proc->ident->lex.len, proc->ident->lex.ptr);
+        exit(1);
+    }
+
+    for (int i = 0; i < proc->params.len; ++i) {
+        Proc_Param *p = proc->params.buf + i;
+        Symbol *param_sym;
+
+        mem_grow(&proc_sym->params);
+        proc_sym->params.buf[proc_sym->params.len++] = p->type->kind;
+
+        param_sym = symtab_insert_var(st, &p->ident->lex, proc_sym->idx,
+                                      SCOPE_BLOCK, p->type->kind);
+        if (param_sym == NULL) {
+            fprintf(stderr, "%s:%d: param %.*s already defined\n", p->ident->pos.file, p->ident->pos.line, p->ident->lex.len, p->ident->lex.ptr);
+            exit(1);
+        }
+    }
+
+    for (int i = 0; i < block->decls.len; ++i) {
+        Decl_Var *var = block->decls.buf[i].body;
+        check_var(var, proc_sym->idx, st);
+    }
+
+    for (int i = 0; i < block->stmts.len; ++i) {
+        Stmt *s = block->stmts.buf + i;
+        check_stmt(s, proc_sym, st);
+    }
+}
+
+void static_check(Decl *decl, Symtab *st)
+{
+    Decl_Proc *proc;
+    Decl_Var *var;
+
+    switch (decl->kind) {
+    case DECL_PROC:
+        proc = decl->body;
+        check_proc(proc, st);
+        break;
+    case DECL_VAR:
+        var = decl->body;
+        check_var(var, -1, st);
         break;
     default:
         assert(0 && "unreachable");
@@ -317,11 +288,10 @@ void gen_decl(Decl *decl, Scope *scope, FILE *out)
 
 int main(int argc, char **argv)
 {
-    char *outpath;
-    FILE *out;
     Parser p;
+    Scanner s;
+    Symtab st;
     Decls decls;
-    Scope global_scope;
 
     argc--;
     argv++;
@@ -331,30 +301,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    scope_make(&global_scope, NULL);
-    meminit(&decls, sizeof(Decl), 256);
-    make_parser(&p, *argv);
+    mem_make(&decls, 256);
+    mem_make(&st, 256);
+    scanner_make(&s, *argv);
+    parser_make(&p, &s);
 
-    parse(&p, &decls);
-
-    outpath = create_outfile(*argv, "asm");
-    out = fopen(outpath, "w");
-    if (out == NULL) {
-        perror(NULL);
-        return 1;
-    }
-
-    // TODO(art): bug in assembler if put this after generation
-    fprintf(out, ".global _start\n"
-                 "_start:\n"
-                 "call main\n"
-                 "halt\n");
+    parser_parse(&p, &decls);
 
     for (int i = 0; i < decls.len; ++i) {
-        Decl *decl;
-
-        decl = decls.buf + i;
-        gen_decl(decl, &global_scope, out);
+        Decl *d = decls.buf + i;
+        static_check(d, &st);
     }
 
     return 0;
