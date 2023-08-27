@@ -114,7 +114,7 @@ Token_Kind check_expr(Expr *expr, int block_idx, Symtab *st)
         }
 
         if (call->args.len != sym->params.len) {
-            fprintf(stderr, "%s:%d: expected %d amount of args but got %d\n", lit->value->pos.file, lit->value->pos.line, sym->params.len, call->args.len);
+            fprintf(stderr, "%s:%d: expected %d args but got %d\n", lit->value->pos.file, lit->value->pos.line, sym->params.len, call->args.len);
             exit(1);
         }
 
