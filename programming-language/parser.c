@@ -5,6 +5,7 @@
 #include "../lib/mem.h"
 #include "../lib/sstring.h"
 
+#include "token.h"
 #include "scanner.h"
 #include "parser.h"
 
@@ -33,7 +34,7 @@ static int next(Parser *p, Token_Kind kind)
 static void consume(Parser *p, Token_Kind kind)
 {
     if (p->tok->kind != kind) {
-        fprintf(stderr, "%s:%d: expected %s but got %s\n", p->tok->pos.file, p->tok->pos.line, scanner_tokstr(kind), scanner_tokstr(p->tok->kind));
+        fprintf(stderr, "%s:%d: expected %s but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(kind), token_str(p->tok->kind));
         exit(1);
     }
 
@@ -42,8 +43,8 @@ static void consume(Parser *p, Token_Kind kind)
 
 static void consume_type(Parser *p)
 {
-    if (scanner_is_type(p->tok->kind) == 0) {
-        fprintf(stderr, "%s:%d: expected type but got %s\n", p->tok->pos.file, p->tok->pos.line, scanner_tokstr(p->tok->kind));
+    if (token_is_type(p->tok->kind) == 0) {
+        fprintf(stderr, "%s:%d: expected type but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(p->tok->kind));
         exit(1);
     }
 
@@ -62,7 +63,7 @@ static void primary(Parser *p, Expr *expr)
     }
 
     if (p->tok->kind != TOK_IDENT && p->tok->kind != TOK_NUM) {
-        fprintf(stderr, "%s:%d: expected number or identifier but got %s\n", p->tok->pos.file, p->tok->pos.line, scanner_tokstr(p->tok->kind));
+        fprintf(stderr, "%s:%d: expected number or identifier but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(p->tok->kind));
         exit(1);
     }
 
@@ -98,9 +99,10 @@ static void call(Parser *p, Expr *expr)
     }
 
     memcpy(&call->callee, expr, sizeof(Expr));
-    mem_make(&call->args, 256);
 
     if (p->tok->kind != TOK_RPAREN) {
+        mem_make(&call->args, 256);
+
         for (;;) {
             Expr *arg;
 
@@ -154,28 +156,6 @@ static void expression(Parser *p, Expr *expr)
     term(p, expr);
 }
 
-static void constant_expression(Parser *p, Expr *expr)
-{
-    Expr_Lit *lit;
-
-    if (p->tok->kind != TOK_NUM) {
-        fprintf(stderr, "%s:%d: expected constant expression\n", p->tok->pos.file, p->tok->pos.line);
-        exit(1);
-    }
-
-    lit = malloc(sizeof(Expr_Lit));
-    if (lit == NULL) {
-        perror("constant_expression");
-        exit(1);
-    }
-
-    lit->value = p->tok;
-    advance(p);
-
-    expr->kind = EXPR_CONST;
-    expr->body = lit;
-}
-
 static void assign(Parser *p, Stmt *stmt)
 {
     Stmt_Assign *assign = malloc(sizeof(Stmt_Assign));
@@ -205,14 +185,14 @@ static void _return(Parser *p, Stmt *stmt)
         exit(1);
     }
 
+    memset(ret, 0, sizeof(Stmt_Ret));
+
     ret->tok = p->tok;
-    ret->has_value = 0;
 
     consume(p, TOK_RET);
 
     if (p->tok->kind != TOK_SEMICOLON) {
         expression(p, &ret->value);
-        ret->has_value = 1;
     }
 
     consume(p, TOK_SEMICOLON);
@@ -220,99 +200,6 @@ static void _return(Parser *p, Stmt *stmt)
     stmt->kind = STMT_RET;
     stmt->body = ret;
 }
-
-static Decl_Var *variable(Parser *p)
-{
-    Decl_Var *var = malloc(sizeof(Decl_Var));
-    if (var == NULL) {
-        perror("variable");
-        exit(1);
-    }
-
-    consume(p, TOK_LET);
-
-    var->ident = p->tok;
-
-    consume(p, TOK_IDENT);
-    consume(p, TOK_COLON);
-
-    var->type = p->tok;
-
-    consume_type(p);
-    consume(p, TOK_EQ);
-
-    return var;
-}
-
-static void block_variable(Parser *p, Decl *decl)
-{
-
-    Decl_Var *var = variable(p);
-
-    expression(p, &var->value);
-    consume(p, TOK_SEMICOLON);
-
-    decl->kind = DECL_VAR;
-    decl->body = var;
-}
-
-static void proc_block(Parser *p, Stmt *stmt)
-{
-    Stmt_Proc_Block *block = malloc(sizeof(Stmt_Proc_Block));
-    if (block == NULL) {
-        perror("proc_block");
-        exit(1);
-    }
-
-    consume(p, TOK_LCURLY);
-
-    mem_make(&block->stmts, 64);
-    mem_make(&block->decls, 64);
-
-    while (p->tok->kind == TOK_LET) {
-        Decl *tmp;
-
-        mem_grow(&block->decls);
-        tmp = mem_next(&block->decls);
-        block_variable(p, tmp);
-    }
-
-    while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
-        Stmt *tmp;
-
-        mem_grow(&block->stmts);
-        tmp = mem_next(&block->stmts);
-        statement(p, tmp);
-    }
-
-    consume(p, TOK_RCULRY);
-
-    stmt->kind = STMT_PROC_BLOCK;
-    stmt->body = block;
-}
-
-//static void block(Parser *p, Stmt *stmt)
-//{
-//    Stmt_Block *block = malloc(sizeof(Stmt_Block));
-//    if (block == NULL) {
-//        perror("parse_block");
-//        exit(1);
-//    }
-
-//    consume(p, TOK_LCURLY);
-
-//    meminit(&block->stmts, sizeof(Stmt), 64);
-
-//    while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
-//        Stmt *tmp = memnext(&block->stmts);
-//        statement(p, tmp);
-//    }
-
-//    consume(p, TOK_RCULRY);
-
-//    stmt->kind = STMT_BLOCK;
-//    stmt->body = block;
-//}
 
 static void statement_expression(Parser *p, Stmt *stmt)
 {
@@ -344,30 +231,60 @@ static void statement(Parser *p, Stmt *stmt)
         _return(p, stmt);
         break;
     default:
-        fprintf(stderr, "%s:%d: expected statement\n", p->tok->pos.file, p->tok->pos.line);
-        exit(1);
+        statement_expression(p, stmt);
+        break;
     }
 }
 
-static void file_variable(Parser *p, Decl *decl)
+static void variable(Parser *p, Decl *decl, Token *storage)
 {
-    Decl_Var *var = variable(p);
+    Decl_Var *var = malloc(sizeof(Decl_Var));
+    if (var == NULL) {
+        perror("variable");
+        exit(1);
+    }
 
-    constant_expression(p, &var->value);
+    memset(var, 0, sizeof(Decl_Var));
+
+    if (storage != NULL) {
+        var->storage = storage->kind;
+    }
+
+    consume(p, TOK_VAR);
+
+    var->ident = p->tok;
+
+    consume(p, TOK_IDENT);
+    consume(p, TOK_COLON);
+
+    var->type = p->tok->kind;
+
+    consume_type(p);
+
+    if (p->tok->kind == TOK_EQ) {
+        advance(p);
+        expression(p, &var->value);
+    }
+
     consume(p, TOK_SEMICOLON);
 
     decl->kind = DECL_VAR;
     decl->body = var;
 }
 
-static void procedure(Parser *p, Decl *decl)
+static void procedure(Parser *p, Decl *decl, Token *storage)
 {
     Decl_Proc *proc = malloc(sizeof(Decl_Proc));
     if (proc == NULL) {
         perror("procedure");
         exit(1);
     }
-    mem_make(&proc->params, 256);
+
+    memset(proc, 0, sizeof(Decl_Proc));
+
+    if (storage != NULL) {
+        proc->storage = storage->kind;
+    }
 
     consume(p, TOK_PROC);
 
@@ -377,6 +294,8 @@ static void procedure(Parser *p, Decl *decl)
     consume(p, TOK_LPAREN);
 
     if (p->tok->kind != TOK_RPAREN) {
+        mem_make(&proc->params, 256);
+
         for (;;) {
             Proc_Param *param;
 
@@ -389,11 +308,12 @@ static void procedure(Parser *p, Decl *decl)
             param = mem_next(&proc->params);
 
             param->ident = p->tok;
-            consume(p, TOK_IDENT);
 
+            consume(p, TOK_IDENT);
             consume(p, TOK_COLON);
 
-            param->type = p->tok;
+            param->type = p->tok->kind;
+
             consume_type(p);
 
             if (p->tok->kind != TOK_COMMA) {
@@ -407,23 +327,58 @@ static void procedure(Parser *p, Decl *decl)
     consume(p, TOK_RPAREN);
     consume(p, TOK_COLON);
 
-    proc->ret_type = p->tok;
-    consume_type(p);
+    proc->ret_type = p->tok->kind;
 
-    proc_block(p, &proc->body);
+    consume_type(p);
 
     decl->kind = DECL_PROC;
     decl->body = proc;
+
+    if (p->tok->kind == TOK_SEMICOLON) {
+        advance(p);
+        return;
+    }
+
+    consume(p, TOK_LCURLY);
+
+    mem_make(&proc->vars, 256);
+
+    while (p->tok->kind == TOK_VAR) {
+        Decl *tmp;
+
+        mem_grow(&proc->vars);
+        tmp = mem_next(&proc->vars);
+        variable(p, tmp, NULL);
+    }
+
+    mem_make(&proc->stmts, 256);
+
+    while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
+        Stmt *tmp;
+
+        mem_grow(&proc->stmts);
+        tmp = mem_next(&proc->stmts);
+        statement(p, tmp);
+    }
+
+    consume(p, TOK_RCULRY);
 }
 
 static void declaration(Parser *p, Decl *decl)
 {
+    Token *storage = NULL;
+
+    if (token_is_storage(p->tok->kind) == 1) {
+        storage = p->tok;
+        advance(p);
+    }
+
     switch (p->tok->kind) {
-    case TOK_PROC:
-        procedure(p, decl);
+    case TOK_VAR:
+        variable(p, decl, storage);
         break;
-    case TOK_LET:
-        file_variable(p, decl);
+    case TOK_PROC:
+        procedure(p, decl, storage);
         break;
     default:
         fprintf(stderr, "%s:%d: expected declaration\n", p->tok->pos.file, p->tok->pos.line);
@@ -433,9 +388,9 @@ static void declaration(Parser *p, Decl *decl)
 
 void parser_parse(Parser *p, Decls *decls)
 {
-    Decl *d;
-
     while (p->tok->kind != TOK_EOF) {
+        Decl *d;
+
         mem_grow(decls);
         d = mem_next(decls);
 

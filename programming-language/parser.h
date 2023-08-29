@@ -1,5 +1,6 @@
-// #include "lib/sstring.h"
-// #include "scanner.h"
+//#include "lib/sstring.h"
+//#include "token.h"
+//#include "scanner.h"
 
 typedef struct {
     Tokens toks;
@@ -9,7 +10,6 @@ typedef struct {
 
 typedef enum {
     EXPR_LIT = 0,
-    EXPR_CONST,
     EXPR_BINARY,
     EXPR_CALL
 } Expr_Kind;
@@ -30,21 +30,19 @@ typedef struct {
 } Expr_Lit;
 
 typedef struct {
-    Expr callee;
-    Exprs args;
-} Expr_Call;
-
-typedef struct {
     Expr x;
     Expr y;
     Token *op;
 } Expr_Binary;
 
+typedef struct {
+    Expr callee;
+    Exprs args;
+} Expr_Call;
+
 typedef enum {
     STMT_ASSIGN = 0,
     STMT_RET,
-    STMT_PROC_BLOCK,
-    STMT_BLOCK,
     STMT_EXPR
 } Stmt_Kind;
 
@@ -67,7 +65,6 @@ typedef struct {
 typedef struct {
     Token *tok;
     Expr value;
-    int has_value;
 } Stmt_Ret;
 
 typedef struct {
@@ -91,34 +88,35 @@ typedef struct {
 } Decls;
 
 typedef struct {
-    Stmts stmts;
-} Stmt_Block;
-
-typedef struct {
-    Decls decls;
-    Stmts stmts;
-} Stmt_Proc_Block;
-
-typedef struct {
     Token *ident;
-    Token *type;
     Expr value;
+    Token_Kind storage;
+    Token_Kind type;
 } Decl_Var;
 
 typedef struct {
     Token *ident;
-    Token *type;
+    Token_Kind type;
 } Proc_Param;
 
 typedef struct {
     Token *ident;
-    Token *ret_type;
+    Stmts stmts;
+
     struct {
         int len;
         int cap;
         Proc_Param *buf;
     } params;
-    Stmt body;
+
+    struct {
+        int len;
+        int cap;
+        Decl *buf;
+    } vars;
+
+    Token_Kind storage;
+    Token_Kind ret_type;
 } Decl_Proc;
 
 void parser_make(Parser *p, Scanner *s);
