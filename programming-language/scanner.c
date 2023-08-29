@@ -6,6 +6,8 @@
 #include "../lib/mem.h"
 #include "../lib/os.h"
 
+#include "token.h"
+
 #include "scanner.h"
 
 typedef struct {
@@ -15,12 +17,15 @@ typedef struct {
 } Kwd_Entry;
 
 static Kwd_Entry keywords[] = {
-    {.str = "let",    .len = 3, .kind = TOK_LET},
+    {.str = "var",    .len = 3, .kind = TOK_VAR},
     {.str = "proc",   .len = 4, .kind = TOK_PROC},
     {.str = "return", .len = 6, .kind = TOK_RET},
+    {.str = "extern", .len = 6, .kind = TOK_EXTERN},
+    {.str = "global", .len = 6, .kind = TOK_GLOBAL},
     {.str = "void",   .len = 4, .kind = TOK_VOID},
     {.str = "u16",    .len = 3, .kind = TOK_U16},
     {.str = "u8",     .len = 2, .kind = TOK_U8},
+
 
     {.str = NULL, .len = 0, .kind = 0} // art: end of array
 };
@@ -31,7 +36,7 @@ static Token_Kind lookup_keyword(Scanner *s)
     int len = s->cur - s->start;
 
     for (Kwd_Entry *e = keywords; e->str != NULL; ++e) {
-        if (len == e->len && memcmp(str, e->str, len) == 0) {
+        if (e->len == len && memcmp(e->str, str, len) == 0) {
             return e->kind;
         }
     }
@@ -145,6 +150,23 @@ scan_again:
             }
             goto scan_again;
         }
+        if (next(s, '*') == 1) {
+            advance(s);
+            advance(s);
+            for (;;) {
+                if (s->ch == '*' && next(s, '/') == 1) {
+                    advance(s);
+                    advance(s);
+                    break;
+                }
+                if (s->ch == '\0') {
+                    fprintf(stderr, "%s:%d: unterminated multiline comment\n", s->file, s->line);
+                    exit(1);
+                }
+                advance(s);
+            }
+            goto scan_again;
+        }
         fprintf(stderr, "%s:%d: unexpected character %c\n", s->file, s->line, s->ch);
         exit(1);
 
@@ -202,12 +224,11 @@ scan_again:
 
 void scanner_scan(Scanner *s, Tokens *toks)
 {
-    Token *tok;
-
     for (;;) {
+        Token *tok;
+
         mem_grow(toks);
         tok = mem_next(toks);
-        memset(tok, 0, sizeof(Token));
 
         scan(s, tok);
 
@@ -229,69 +250,4 @@ void scanner_make(Scanner *s, char *file)
     s->start = 0;
     s->line = 1;
     s->ch = s->src[0];
-}
-
-int scanner_is_type(Token_Kind kind)
-{
-    return kind > TOK_type_begin && kind < TOK_type_end;
-}
-
-int scanner_is_numtype(Token_Kind kind)
-{
-    return kind > TOK_numtype_begin && kind < TOK_numtype_end;
-}
-
-char *scanner_tokstr(Token_Kind kind)
-{
-    switch (kind) {
-    case TOK_IDENT:
-		return "identifier";
-    case TOK_NUM:
-		return "number";
-
-    case TOK_EQ:
-		return "=";
-
-    case TOK_PLUS:
-		return "+";
-    case TOK_MINUS:
-		return "-";
-
-    case TOK_COMMA:
-		return ",";
-    case TOK_COLON:
-        return ":";
-    case TOK_SEMICOLON:
-		return ";";
-
-    case TOK_LPAREN:
-		return "(";
-    case TOK_RPAREN:
-		return ")";
-    case TOK_LCURLY:
-		return "{";
-    case TOK_RCULRY:
-		return "}";
-
-    case TOK_LET:
-		return "let";
-    case TOK_PROC:
-		return "proc";
-    case TOK_RET:
-		return "return";
-
-    case TOK_VOID:
-        return "void";
-    case TOK_U16:
-        return "u16";
-    case TOK_U8:
-        return "u8";
-
-    case TOK_EOF:
-		return "<end of file>";
-
-    default:
-        fprintf(stderr, "unexpected token kind %d\n", kind);
-        exit(1);
-    }
 }

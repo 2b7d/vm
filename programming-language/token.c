@@ -1,5 +1,7 @@
 #include <assert.h>
 
+#include "../lib/sstring.h"
+
 #include "token.h"
 
 char *token_str(Token_Kind kind)
