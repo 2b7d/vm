@@ -11,4 +11,4 @@ asm
 ln
 *.vm
 
-pl
+vmc

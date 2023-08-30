@@ -11,6 +11,7 @@ typedef struct {
 typedef enum {
     EXPR_LIT = 0,
     EXPR_BINARY,
+    EXPR_VAR,
     EXPR_CALL
 } Expr_Kind;
 
@@ -34,6 +35,10 @@ typedef struct {
     Expr y;
     Token *op;
 } Expr_Binary;
+
+typedef struct {
+    Token *ident;
+} Expr_Var;
 
 typedef struct {
     Expr callee;
@@ -80,6 +85,7 @@ typedef struct {
 
 typedef struct {
     Token *ident;
+    Stmts vars;
     Stmts stmts;
 
     struct {
@@ -87,12 +93,6 @@ typedef struct {
         int cap;
         Proc_Param *buf;
     } params;
-
-    struct {
-        int len;
-        int cap;
-        Stmt *buf;
-    } vars;
 
     Token_Kind storage;
     Token_Kind ret_type;

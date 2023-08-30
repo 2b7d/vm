@@ -54,30 +54,45 @@ static void consume_type(Parser *p)
 static void primary(Parser *p, Expr *expr)
 {
     Expr_Lit *lit;
+    Expr_Var *var;
 
-    if (p->tok->kind == TOK_LPAREN) {
+    switch (p->tok->kind) {
+    case TOK_LPAREN:
         advance(p);
         expression(p, expr);
         consume(p, TOK_RPAREN);
-        return;
-    }
+        break;
+    case TOK_IDENT:
+        var = malloc(sizeof(Expr_Var));
+        if (var == NULL) {
+            perror("primary");
+            exit(1);
+        }
 
-    if (p->tok->kind != TOK_IDENT && p->tok->kind != TOK_NUM) {
+        var->ident = p->tok;
+        advance(p);
+
+        expr->kind = EXPR_VAR;
+        expr->body = var;
+        break;
+    case TOK_NUM:
+        lit = malloc(sizeof(Expr_Lit));
+        if (lit == NULL) {
+            perror("primary");
+            exit(1);
+        }
+
+        lit->value = p->tok;
+        advance(p);
+
+        expr->kind = EXPR_LIT;
+        expr->body = lit;
+        break;
+    default:
         fprintf(stderr, "%s:%d: expected expression but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(p->tok->kind));
         exit(1);
+
     }
-
-    lit = malloc(sizeof(Expr_Lit));
-    if (lit == NULL) {
-        perror("primary");
-        exit(1);
-    }
-
-    lit->value = p->tok;
-    advance(p);
-
-    expr->kind = EXPR_LIT;
-    expr->body = lit;
 }
 
 static void call(Parser *p, Expr *expr)
@@ -318,6 +333,7 @@ static void procedure(Parser *p, Stmt *stmt, Token *storage)
     consume(p, TOK_LCURLY);
 
     mem_make(&proc->vars, 256);
+    mem_make(&proc->stmts, 256);
 
     while (p->tok->kind == TOK_VAR) {
         Stmt *s;
@@ -353,8 +369,6 @@ static void procedure(Parser *p, Stmt *stmt, Token *storage)
         s->kind = STMT_PROC_VAR;
         s->body = var;
     }
-
-    mem_make(&proc->stmts, 256);
 
     while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
         Stmt *s;

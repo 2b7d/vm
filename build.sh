@@ -37,7 +37,7 @@ case $1 in
         ;;
     programming-language)
         files="programming-language/*.c lib/sstring.c lib/os.c"
-        outname=pl
+        outname=vmc
         ;;
     all)
         ./build.sh vm $2 &

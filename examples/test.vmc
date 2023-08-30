@@ -1,0 +1,71 @@
+extern var some_value: u16;
+extern proc inc2(arg: u16): u16;
+
+global proc inc(arg: u16): u16;
+
+var final: u16 = 0;
+
+proc main(): void {
+    var a: u16 = 2;
+    var b: u16 = 5;
+
+    a = inc(a);  // 3
+    b = inc2(b); // 7
+
+    a = final + b;
+
+    final = some_value - (a + b); // 69 - 10 = 59
+
+    return;
+}
+
+global proc inc(arg: u16): u16 {
+    var val: u16 = 1;
+
+    arg = arg + val;
+    return arg;
+}
+
+/*
+.extern stdout
+.extern inc2
+.global proc
+
+final: .word 5
+
+inc:
+    push 1
+
+    push _fp ld push 4 sub ld
+    push _fp ld push 2 add ld
+    add
+    push _fp ld push 4 sub st
+
+    push _fp ld push 4 sub ld
+    ret
+
+main:
+    push 2
+    push 5
+
+    push _fp ld push 2 add ld
+    call inc
+    drop
+    push _rp ld
+    push _fp ld push 2 add st
+
+    push _fp ld push 4 add ld
+    call inc2
+    drop
+    push _rp ld
+    push _fp ld push 4 add st
+
+    push some_value ld
+    push _fp ld push 2 add ld
+    push _fp ld push 4 add ld
+    add
+    sub
+    push final st
+
+    ret
+*/
