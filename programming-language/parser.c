@@ -63,7 +63,7 @@ static void primary(Parser *p, Expr *expr)
     }
 
     if (p->tok->kind != TOK_IDENT && p->tok->kind != TOK_NUM) {
-        fprintf(stderr, "%s:%d: expected number or identifier but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(p->tok->kind));
+        fprintf(stderr, "%s:%d: expected expression but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(p->tok->kind));
         exit(1);
     }
 
@@ -227,60 +227,36 @@ static void statement(Parser *p, Stmt *stmt)
             statement_expression(p, stmt);
         }
         break;
+    case TOK_NUM:
+    case TOK_LPAREN:
+        statement_expression(p, stmt);
+        break;
     case TOK_RET:
         _return(p, stmt);
         break;
-    default:
-        statement_expression(p, stmt);
-        break;
-    }
-}
 
-static void variable(Parser *p, Decl *decl, Token *storage)
-{
-    Decl_Var *var = malloc(sizeof(Decl_Var));
-    if (var == NULL) {
-        perror("variable");
+    case TOK_VAR:
+        fprintf(stderr, "%s:%d: variables are declared on top of procedure\n", p->tok->pos.file, p->tok->pos.line);
+        exit(1);
+    case TOK_PROC:
+        fprintf(stderr, "%s:%d: can not declare procedure inside of procedure\n", p->tok->pos.file, p->tok->pos.line);
+        exit(1);
+
+    default:
+        fprintf(stderr, "%s:%d: expected statement but got %s\n", p->tok->pos.file, p->tok->pos.line, token_str(p->tok->kind));
         exit(1);
     }
-
-    memset(var, 0, sizeof(Decl_Var));
-
-    if (storage != NULL) {
-        var->storage = storage->kind;
-    }
-
-    consume(p, TOK_VAR);
-
-    var->ident = p->tok;
-
-    consume(p, TOK_IDENT);
-    consume(p, TOK_COLON);
-
-    var->type = p->tok->kind;
-
-    consume_type(p);
-
-    if (p->tok->kind == TOK_EQ) {
-        advance(p);
-        expression(p, &var->value);
-    }
-
-    consume(p, TOK_SEMICOLON);
-
-    decl->kind = DECL_VAR;
-    decl->body = var;
 }
 
-static void procedure(Parser *p, Decl *decl, Token *storage)
+static void procedure(Parser *p, Stmt *stmt, Token *storage)
 {
-    Decl_Proc *proc = malloc(sizeof(Decl_Proc));
+    Stmt_Proc *proc = malloc(sizeof(Stmt_Proc));
     if (proc == NULL) {
         perror("procedure");
         exit(1);
     }
 
-    memset(proc, 0, sizeof(Decl_Proc));
+    memset(proc, 0, sizeof(Stmt_Proc));
 
     if (storage != NULL) {
         proc->storage = storage->kind;
@@ -331,8 +307,8 @@ static void procedure(Parser *p, Decl *decl, Token *storage)
 
     consume_type(p);
 
-    decl->kind = DECL_PROC;
-    decl->body = proc;
+    stmt->kind = STMT_PROC;
+    stmt->body = proc;
 
     if (p->tok->kind == TOK_SEMICOLON) {
         advance(p);
@@ -344,27 +320,103 @@ static void procedure(Parser *p, Decl *decl, Token *storage)
     mem_make(&proc->vars, 256);
 
     while (p->tok->kind == TOK_VAR) {
-        Decl *tmp;
+        Stmt *s;
+        Stmt_Proc_Var *var;
 
         mem_grow(&proc->vars);
-        tmp = mem_next(&proc->vars);
-        variable(p, tmp, NULL);
+        s = mem_next(&proc->vars);
+
+        var = malloc(sizeof(Stmt_Proc_Var));
+        if (var == NULL) {
+            perror("procedure");
+            exit(1);
+        }
+
+        consume(p, TOK_VAR);
+
+        var->ident = p->tok;
+
+        consume(p, TOK_IDENT);
+        consume(p, TOK_COLON);
+
+        var->type = p->tok->kind;
+
+        consume_type(p);
+
+        if (p->tok->kind == TOK_EQ) {
+            advance(p);
+            expression(p, &var->value);
+        }
+
+        consume(p, TOK_SEMICOLON);
+
+        s->kind = STMT_PROC_VAR;
+        s->body = var;
     }
 
     mem_make(&proc->stmts, 256);
 
     while (p->tok->kind != TOK_RCULRY && p->tok->kind != TOK_EOF) {
-        Stmt *tmp;
+        Stmt *s;
 
         mem_grow(&proc->stmts);
-        tmp = mem_next(&proc->stmts);
-        statement(p, tmp);
+        s = mem_next(&proc->stmts);
+        statement(p, s);
     }
 
     consume(p, TOK_RCULRY);
 }
 
-static void declaration(Parser *p, Decl *decl)
+static void variable(Parser *p, Stmt *stmt, Token *storage)
+{
+    Stmt_Var *var = malloc(sizeof(Stmt_Var));
+    if (var == NULL) {
+        perror("variable");
+        exit(1);
+    }
+
+    memset(var, 0, sizeof(Stmt_Var));
+
+    if (storage != NULL) {
+        var->storage = storage->kind;
+    }
+
+    consume(p, TOK_VAR);
+
+    var->ident = p->tok;
+
+    consume(p, TOK_IDENT);
+    consume(p, TOK_COLON);
+
+    var->type = p->tok->kind;
+
+    consume_type(p);
+
+    if (p->tok->kind == TOK_EQ) {
+        Expr_Lit *lit;
+
+        advance(p);
+        expression(p, &var->value);
+
+        if (var->value.kind != EXPR_LIT) {
+            fprintf(stderr, "%s:%d: expected constant value\n", p->tok->pos.file, p->tok->pos.line);
+            exit(1);
+        }
+
+        lit = var->value.body;
+        if (lit->value->kind == TOK_IDENT) {
+            fprintf(stderr, "%s:%d: expected constant value\n", p->tok->pos.file, p->tok->pos.line);
+            exit(1);
+        }
+    }
+
+    consume(p, TOK_SEMICOLON);
+
+    stmt->kind = STMT_VAR;
+    stmt->body = var;
+}
+
+static void declaration(Parser *p, Stmt *stmt)
 {
     Token *storage = NULL;
 
@@ -375,10 +427,10 @@ static void declaration(Parser *p, Decl *decl)
 
     switch (p->tok->kind) {
     case TOK_VAR:
-        variable(p, decl, storage);
+        variable(p, stmt, storage);
         break;
     case TOK_PROC:
-        procedure(p, decl, storage);
+        procedure(p, stmt, storage);
         break;
     default:
         fprintf(stderr, "%s:%d: expected declaration\n", p->tok->pos.file, p->tok->pos.line);
@@ -386,15 +438,15 @@ static void declaration(Parser *p, Decl *decl)
     }
 }
 
-void parser_parse(Parser *p, Decls *decls)
+void parser_parse(Parser *p, Stmts *stmts)
 {
     while (p->tok->kind != TOK_EOF) {
-        Decl *d;
+        Stmt *s;
 
-        mem_grow(decls);
-        d = mem_next(decls);
+        mem_grow(stmts);
+        s = mem_next(stmts);
 
-        declaration(p, d);
+        declaration(p, s);
     }
 }
 

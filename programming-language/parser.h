@@ -41,7 +41,10 @@ typedef struct {
 } Expr_Call;
 
 typedef enum {
-    STMT_ASSIGN = 0,
+    STMT_VAR = 0,
+    STMT_PROC,
+    STMT_PROC_VAR,
+    STMT_ASSIGN,
     STMT_RET,
     STMT_EXPR
 } Stmt_Kind;
@@ -60,39 +63,15 @@ typedef struct {
 typedef struct {
     Token *ident;
     Expr value;
-} Stmt_Assign;
-
-typedef struct {
-    Token *tok;
-    Expr value;
-} Stmt_Ret;
-
-typedef struct {
-    Expr expr;
-} Stmt_Expr;
-
-typedef enum {
-    DECL_VAR = 0,
-    DECL_PROC
-} Decl_Kind;
-
-typedef struct {
-    Decl_Kind kind;
-    void *body;
-} Decl;
-
-typedef struct {
-    int len;
-    int cap;
-    Decl *buf;
-} Decls;
+    Token_Kind storage;
+    Token_Kind type;
+} Stmt_Var;
 
 typedef struct {
     Token *ident;
     Expr value;
-    Token_Kind storage;
     Token_Kind type;
-} Decl_Var;
+} Stmt_Proc_Var;
 
 typedef struct {
     Token *ident;
@@ -112,12 +91,26 @@ typedef struct {
     struct {
         int len;
         int cap;
-        Decl *buf;
+        Stmt *buf;
     } vars;
 
     Token_Kind storage;
     Token_Kind ret_type;
-} Decl_Proc;
+} Stmt_Proc;
+
+typedef struct {
+    Token *ident;
+    Expr value;
+} Stmt_Assign;
+
+typedef struct {
+    Token *tok;
+    Expr value;
+} Stmt_Ret;
+
+typedef struct {
+    Expr expr;
+} Stmt_Expr;
 
 void parser_make(Parser *p, Scanner *s);
-void parser_parse(Parser *p, Decls *decls);
+void parser_parse(Parser *p, Stmts *stmts);
