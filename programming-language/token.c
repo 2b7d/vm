@@ -2,7 +2,7 @@
 
 #include "../lib/sstring.h"
 
-#include "token.h"
+#include "vmc.h"
 
 char *token_str(Token_Kind kind)
 {
@@ -69,4 +69,9 @@ int token_is_storage(Token_Kind kind)
 int token_is_type(Token_Kind kind)
 {
     return kind > TOK_type_begin && kind < TOK_type_end;
+}
+
+int token_is_numtype(Token_Kind kind)
+{
+    return kind > TOK_numtype_begin && kind < TOK_numtype_end;
 }

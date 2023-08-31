@@ -1,7 +1,5 @@
 //#include "lib/sstring.h:
-//#include "token.h:
-//#include "scanner.h:
-//#include "parser.h:
+//#include "vmc.h:
 
 struct scope;
 

@@ -5,9 +5,7 @@
 #include "../lib/mem.h"
 #include "../lib/sstring.h"
 
-#include "token.h"
-#include "scanner.h"
-#include "parser.h"
+#include "vmc.h"
 
 #include "resolver.h"
 

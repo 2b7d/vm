@@ -6,9 +6,7 @@
 #include "../lib/mem.h"
 #include "../lib/os.h"
 
-#include "token.h"
-
-#include "scanner.h"
+#include "vmc.h"
 
 typedef struct {
     char *str;

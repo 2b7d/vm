@@ -1,15 +1,15 @@
 /*
- * program = declaration* EOF
+ * program = (var|proc)* EOF
  *
- * declaration = var|proc
- * var  = storage? "var" IDENT ":" type ("=" expression)? ";"
- * proc = storage? "proc" IDENT "(" params? ")" ":" type (";"|proc_body)
- * proc_body = "{" var* statement* "}"
- *
- * statement = assign|return|stmt_expr
+ * var       = storage? "var" IDENT ":" type ("=" NUM)? ";"
+ * proc      = storage? "proc" IDENT "(" params? ")" ":" type (";"|proc_body)
+ * proc_var  = "var" IDENT ":" type ("=" expression)? ";"
  * assign    = IDENT "=" expression ";"
  * return    = "return" expression? ";"
  * stmt_expr = expression ";"
+ *
+ * proc_body = "{" proc_var* statement* "}"
+ * statement = assign|return|stmt_expr
  *
  * expression = term
  * term    = call (("+"|"-") call)*
@@ -32,20 +32,22 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include "../lib/mem.h"
 #include "../lib/sstring.h"
 
-#include "token.h"
-#include "scanner.h"
-#include "parser.h"
+#include "vmc.h"
+
+#include "resolver.h"
+#include "semantic.h"
 
 int main(int argc, char **argv)
 {
     Parser p;
     Scanner s;
-    Decls decls;
+    Stmts stmts;
+    Resolver r;
+    Checker c;
 
     argc--;
     argv++;
@@ -55,17 +57,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    mem_make(&decls, 256);
+    mem_make(&stmts, 256);
     scanner_make(&s, *argv);
     parser_make(&p, &s);
+    resolver_make(&r);
+    semantic_make_checker(&c);
 
-    parser_parse(&p, &decls);
-
-    for (int i = 0; i < decls.len; ++i) {
-        Decl d;
-
-        d = decls.buf[i];
-    }
+    parser_parse(&p, &stmts);
+    resolver_resolve(&r, &stmts);
+    semantic_check(&c, &stmts);
 
     return 0;
 }
