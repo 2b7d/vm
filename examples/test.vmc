@@ -12,8 +12,6 @@ proc main(): void {
     a = inc(a);  // 3
     b = inc2(b); // 7
 
-    a = final + b;
-
     final = some_value - (a + b); // 69 - 10 = 59
 
     return;
