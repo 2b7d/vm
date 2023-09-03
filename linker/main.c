@@ -42,7 +42,6 @@ struct gsymbol {
     int symidx;
 };
 
-
 struct module {
     int idx;
 
@@ -80,7 +79,7 @@ struct {
     struct module *buf;
 } modules;
 
-int _start_addr;
+int _start_addr = -1;
 
 int valid_idx(int idx, int max)
 {
@@ -286,7 +285,6 @@ int main(int argc, char **argv)
     meminit(&gsymtab, sizeof(struct gsymbol), 256);
     data_offset = 6; // TODO(art): magic number
     text_offset = 0;
-    _start_addr = -1;
 
     for (int i = 0; i < argc; ++i) {
         struct module *mod;
