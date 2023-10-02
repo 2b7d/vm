@@ -4,10 +4,16 @@ typedef enum {
     TOK_IDENT = 0,
     TOK_NUM,
 
-    TOK_EQ,
-
     TOK_PLUS,
     TOK_MINUS,
+    TOK_SLASH,
+    TOK_STAR,
+
+    TOK_EQ,
+    TOK_EQEQ,
+    TOK_LT,
+    TOK_GT,
+    TOK_BANG,
 
     TOK_COMMA,
     TOK_COLON,
@@ -21,6 +27,8 @@ typedef enum {
     TOK_VAR,
     TOK_PROC,
     TOK_RET,
+    TOK_TRUE,
+    TOK_FALSE,
 
     TOK_storage_begin,
     TOK_EXTERN,
@@ -43,8 +51,8 @@ typedef struct {
     string lex;
 
     union {
-        int as_num;
-    } value;
+        int num;
+    } as;
 
     struct {
         char *file;
@@ -77,14 +85,28 @@ typedef struct {
 
 typedef enum {
     EXPR_LIT = 0,
-    EXPR_BINARY,
-    EXPR_VAR,
-    EXPR_CALL
+    EXPR_UNARY,
+    EXPR_BINARY
 } Expr_Kind;
 
-typedef struct {
+typedef struct expr {
     Expr_Kind kind;
-    void *body;
+    union {
+        struct {
+            Token *value;
+        } lit;
+
+        struct {
+            struct expr x;
+            Token *op;
+        } unary;
+
+        struct {
+            struct expr x;
+            struct expr y;
+            Token *op;
+        } binary;
+    } as;
 } Expr;
 
 typedef struct {
@@ -93,37 +115,19 @@ typedef struct {
     Expr *buf;
 } Exprs;
 
-typedef struct {
-    Token *value;
-} Expr_Lit;
-
-typedef struct {
-    Expr x;
-    Expr y;
-    Token *op;
-} Expr_Binary;
-
-typedef struct {
-    Token *ident;
-} Expr_Var;
-
-typedef struct {
-    Expr callee;
-    Exprs args;
-} Expr_Call;
-
 typedef enum {
-    STMT_VAR = 0,
-    STMT_PROC,
-    STMT_PROC_VAR,
-    STMT_ASSIGN,
-    STMT_RET,
-    STMT_EXPR
+    STMT_EXPR = 0
 } Stmt_Kind;
 
 typedef struct {
+    struct expr expr;
+} Stmt_Expr;
+
+typedef struct {
     Stmt_Kind kind;
-    void *body;
+    union {
+        Stmt_Expr stmt_expr;
+    } as;
 } Stmt;
 
 typedef struct {
@@ -131,53 +135,6 @@ typedef struct {
     int cap;
     Stmt *buf;
 } Stmts;
-
-typedef struct {
-    Token *ident;
-    Expr value;
-    Token_Kind storage;
-    Token_Kind type;
-} Stmt_Var;
-
-typedef struct {
-    Token *ident;
-    Expr value;
-    Token_Kind type;
-} Stmt_Proc_Var;
-
-typedef struct {
-    Token *ident;
-    Token_Kind type;
-} Proc_Param;
-
-typedef struct {
-    Token *ident;
-    Stmts vars;
-    Stmts stmts;
-
-    struct {
-        int len;
-        int cap;
-        Proc_Param *buf;
-    } params;
-
-    Token_Kind storage;
-    Token_Kind ret_type;
-} Stmt_Proc;
-
-typedef struct {
-    Token *ident;
-    Expr value;
-} Stmt_Assign;
-
-typedef struct {
-    Token *tok;
-    Expr value;
-} Stmt_Ret;
-
-typedef struct {
-    Expr expr;
-} Stmt_Expr;
 
 char *token_str(Token_Kind kind);
 int token_is_storage(Token_Kind kind);

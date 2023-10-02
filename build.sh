@@ -36,7 +36,7 @@ case $1 in
         outname=ln
         ;;
     programming-language)
-        files="programming-language/*.c lib/sstring.c lib/os.c"
+        files="programming-language/main.c programming-language/parser.c programming-language/token.c programming-language/scanner.c lib/sstring.c lib/os.c lib/path.c"
         outname=vmc
         ;;
     all)

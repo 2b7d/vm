@@ -1,69 +1,54 @@
-extern var some_value: u16;
-extern proc inc2(arg: u16): u16;
+extern var a;
+global var b = 5;
+       var c = true;
+       var d = "hello, world!\n";
+       var e = [1, true, "king"];
+       var f = {a: 1, b: true, c: "hello, world\n"};
 
-global proc inc(arg: u16): u16;
-
-var final: u16 = 0;
-
-proc main(): void {
-    var a: u16 = 2;
-    var b: u16 = 5;
-
-    a = inc(a);  // 3
-    b = inc2(b); // 7
-
-    final = some_value - (a + b); // 69 - 10 = 59
-
-    return;
-}
-
-global proc inc(arg: u16): u16 {
-    var val: u16 = 1;
-
-    arg = arg + val;
-    return arg;
-}
-
+       var g = [1, [1, 2]];
+       var e = {a: 1, b: {a: 1, b: 2}};
 /*
-.extern stdout
-.extern inc2
-.global proc
 
-final: .word 5
+.extern a
 
-inc:
-    push 1
+0   ds: .byte "hello, world!\n", 0
+    e2s: .byte "king", 0
+    fc: .byte "hello, world\n", 0
 
-    push _fp ld push 4 sub ld
-    push _fp ld push 2 add ld
-    add
-    push _fp ld push 4 sub st
+3 b: .word 5
+  c: .word 1
+  d: .word ds
+  e: .word 1, 1, e2s
+  f: .word 1, 1, fc
+  g: .word 1, 1, 2
+  e: .word 1, 1, 2
 
-    push _fp ld push 4 sub ld
-    ret
+// b = b + 3;
+push 3 ld push 3 add
+push 3 st
 
-main:
-    push 2
-    push 5
+// b = d[0];
+push 5 ld push 0 add ldb ctw
+push 3 st
 
-    push _fp ld push 2 add ld
-    call inc
-    drop
-    push _rp ld
-    push _fp ld push 2 add st
+// b = e[1];
+push 6 push 1 add ld
+push 3 st
 
-    push _fp ld push 4 add ld
-    call inc2
-    drop
-    push _rp ld
-    push _fp ld push 4 add st
+// b = e[2][4];
+push 6 push 2 add ld push 4 add ldb ctw
+push 3 st
 
-    push some_value ld
-    push _fp ld push 2 add ld
-    push _fp ld push 4 add ld
-    add
-    sub
-    push final st
+// b = f.b
+push 9 push 1 ld
+push 3 st
 
-    ret
+// b = f.c[2]
+push 9 push 2 ld push 2 add ldb ctw
+push 3 st
+
+// b = g[1][1]
+push 12 push 1 add ld
+
 */
+

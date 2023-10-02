@@ -18,6 +18,8 @@ static Kwd_Entry keywords[] = {
     {.str = "var",    .len = 3, .kind = TOK_VAR},
     {.str = "proc",   .len = 4, .kind = TOK_PROC},
     {.str = "return", .len = 6, .kind = TOK_RET},
+    {.str = "true",   .len = 4, .kind = TOK_TRUE},
+    {.str = "false",  .len = 5, .kind = TOK_FALSE},
     {.str = "extern", .len = 6, .kind = TOK_EXTERN},
     {.str = "global", .len = 6, .kind = TOK_GLOBAL},
     {.str = "void",   .len = 4, .kind = TOK_VOID},
@@ -77,7 +79,7 @@ static void make_num(Token *tok)
     char *lex = string_toc(&tok->lex);
 
     // TODO(art): handle convert errors
-    tok->value.as_num = atoi(lex);
+    tok->as.num = atoi(lex);
     free(lex);
 }
 
@@ -128,11 +130,6 @@ scan_again:
         advance(s);
         goto scan_again;
 
-    case '=':
-        advance(s);
-        make_tok(s, tok, TOK_EQ);
-        break;
-
     case '+':
         advance(s);
         make_tok(s, tok, TOK_PLUS);
@@ -165,8 +162,35 @@ scan_again:
             }
             goto scan_again;
         }
-        fprintf(stderr, "%s:%d: unexpected character %c\n", s->file, s->line, s->ch);
-        exit(1);
+        advance(s);
+        make_tok(s, tok, TOK_SLASH);
+        break;
+    case '*':
+        advance(s);
+        make_tok(s, tok, TOK_STAR);
+        break;
+
+    case '=':
+        advance(s);
+        if (s->ch == '=') {
+            advance(s);
+            make_tok(s, tok, TOK_EQEQ);
+        } else {
+            make_tok(s, tok, TOK_EQ);
+        }
+        break;
+    case '<':
+        advance(s);
+        make_tok(s, tok, TOK_LT);
+        break;
+    case '>':
+        advance(s);
+        make_tok(s, tok, TOK_GT);
+        break;
+    case '!':
+        advance(s);
+        make_tok(s, tok, TOK_BANG);
+        break;
 
     case ',':
         advance(s);
