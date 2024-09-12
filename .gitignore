@@ -1,14 +1,1 @@
 vm
-
-ppc
-*.i
-
-diasm
-
-asm
-*.o
-
-ln
-*.vm
-
-vmc

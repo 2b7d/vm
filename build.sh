@@ -19,36 +19,6 @@ case $1 in
         files=vm.c
         outname=vm
         ;;
-    assembler)
-        files="assembler/*.c lib/os.c lib/mem.c lib/path.c lib/sstring.c"
-        outname=asm
-        ;;
-    preprocessor)
-        files="preprocessor/main.c lib/os.c lib/mem.c lib/path.c lib/sstring.c"
-        outname=ppc
-        ;;
-    disassembler)
-        files="disassembler/main.c lib/sstring.c"
-        outname=diasm
-        ;;
-    linker)
-        files="linker/main.c lib/sstring.c lib/mem.c"
-        outname=ln
-        ;;
-    programming-language)
-        files="programming-language/main.c programming-language/parser.c programming-language/token.c programming-language/scanner.c lib/sstring.c lib/os.c lib/path.c"
-        outname=vmc
-        ;;
-    all)
-        ./build.sh vm $2 &
-        ./build.sh assembler $2 &
-        ./build.sh preprocessor $2 &
-        ./build.sh disassembler $2 &
-        ./build.sh linker $2 &
-        ./build.sh programming-language $2 &
-        wait
-        exit 0
-        ;;
     *)
         echo "unknown build option $1"
         exit 1
