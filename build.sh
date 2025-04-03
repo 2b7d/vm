@@ -2,31 +2,16 @@
 
 set -e
 
-files=
-outname=
+files=vm.c
 
-flags="-g -Werror=declaration-after-statement -Werror=switch-default -Wall -Wextra -pedantic -std=c99"
-incl=
-libs=
+flags="-Werror=declaration-after-statement \
+       -Wall -Wextra -Werror \
+       -pedantic -std=c99"
 
-if [[ -z $1 ]]; then
-    echo "provide build option"
-    exit 1
+if [[ $1 = "prod" ]]; then
+    flags+=" -s -O3"
+else
+    flags+=" -ggdb"
 fi
 
-case $1 in
-    vm)
-        files=vm.c
-        outname=vm
-        ;;
-    *)
-        echo "unknown build option $1"
-        exit 1
-        ;;
-esac
-
-if [[ $2 = "prod" ]]; then
-    flags=${flags/-g/-O2}
-fi
-
-gcc $flags -o $outname $files $incl $libs
+gcc $flags -o vm $files
