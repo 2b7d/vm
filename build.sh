@@ -2,16 +2,20 @@
 
 set -e
 
-files=vm.c
-
-flags="-Werror=declaration-after-statement \
-       -Wall -Wextra -Werror \
-       -pedantic -std=c99"
+files=main.c
+flags="-o $outfile -Werror=declaration-after-statement -std=c99"
+outfile=vm
 
 if [[ $1 = "prod" ]]; then
-    flags+=" -s -O3"
+    flags+=" -Wall -Wextra -Werror -pedantic -s -O3"
+elif [[ $1 = "test" ]]; then
+    flags+=" -DTEST"
 else
     flags+=" -ggdb"
 fi
 
-gcc $flags -o vm $files
+gcc $flags -o $outfile $files
+
+if [[ $1 = "run" || $2 == "run" ]]; then
+    ./$outfile
+fi
