@@ -3,7 +3,7 @@
 set -e
 
 files=main.c
-flags="-o $outfile -Werror=declaration-after-statement -std=c99"
+flags="-Werror=declaration-after-statement -std=c99"
 outfile=vm
 
 if [[ $1 = "prod" ]]; then

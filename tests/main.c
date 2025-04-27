@@ -57,30 +57,36 @@ void reset_vm()
 #include "movi.c"
 #include "movb.c"
 #include "movbe.c"
+
 #include "st.c"
 #include "sti.c"
 #include "stb.c"
 #include "stbi.c"
+
 #include "ld.c"
 #include "ldi.c"
 #include "ldb.c"
 #include "ldbi.c"
+
 #include "add.c"
 #include "addi.c"
 #include "addb.c"
 #include "addbi.c"
 #include "inc.c"
 #include "incb.c"
+
 #include "sub.c"
 #include "subi.c"
 #include "subb.c"
 #include "subbi.c"
 #include "dec.c"
 #include "decb.c"
+
 #include "cmp.c"
 #include "cmpi.c"
 #include "cmpb.c"
 #include "cmpbi.c"
+
 #include "jabs.c"
 #include "je.c"
 #include "jne.c"
