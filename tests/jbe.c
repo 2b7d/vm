@@ -1,4 +1,4 @@
-void test_jnn()
+void test_jbe()
 {
     struct test_case {
         char *title;
@@ -10,19 +10,25 @@ void test_jnn()
     struct test_case cases[] = {
         {
             .title = "jumps to address",
+            .a = 4,
+            .b = 5,
+            .expect = 1
+        },
+        {
+            .title = "jumps to address 2",
             .a = 5,
-            .b = 4,
+            .b = 5,
             .expect = 1
         },
         {
             .title = "does not jump to address",
-            .a = -5,
-            .b = 0,
+            .a = 5,
+            .b = 4,
             .expect = 0
         }
     };
 
-    printf("test_jnn\n");
+    printf("test_jbe\n");
 
     for (int i = 0; i < arrlen(cases); ++i) {
         struct test_case tcase = cases[i];
@@ -32,7 +38,7 @@ void test_jnn()
 
         regfile[R10] = tcase.a;
         cmpi(tcase.b, R10);
-        jnn(69);
+        jbe(69);
         movi(0, R10);
         halt();
 

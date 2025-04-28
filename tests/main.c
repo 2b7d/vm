@@ -50,8 +50,22 @@ void reset_vm()
 #define jabs(imm) write_byte(JABS, pc++), write_word((imm), pc++), pc++
 #define je(imm) write_byte(JE, pc++), write_word((imm), pc++), pc++
 #define jne(imm) write_byte(JNE, pc++), write_word((imm), pc++), pc++
-#define jn(imm) write_byte(JN, pc++), write_word((imm), pc++), pc++
-#define jnn(imm) write_byte(JNN, pc++), write_word((imm), pc++), pc++
+#define jg(imm) write_byte(JG, pc++), write_word((imm), pc++), pc++
+#define jge(imm) write_byte(JGE, pc++), write_word((imm), pc++), pc++
+#define jl(imm) write_byte(JL, pc++), write_word((imm), pc++), pc++
+#define jle(imm) write_byte(JLE, pc++), write_word((imm), pc++), pc++
+#define ja(imm) write_byte(JA, pc++), write_word((imm), pc++), pc++
+#define jae(imm) write_byte(JAE, pc++), write_word((imm), pc++), pc++
+#define jb(imm) write_byte(JB, pc++), write_word((imm), pc++), pc++
+#define jbe(imm) write_byte(JBE, pc++), write_word((imm), pc++), pc++
+
+#define push(r) write_byte(PUSH, pc++), write_byte((r), pc++)
+#define pushi(imm) write_byte(PUSHI, pc++), write_word((imm), pc++), pc++
+#define pop(r) write_byte(POP, pc++), write_byte((r), pc++)
+
+#define call(imm) write_byte(CALL, pc++), write_word((imm), pc++), pc++
+#define callr(r) write_byte(CALLR, pc++), write_byte((r), pc++)
+#define ret() write_byte(RET, pc++)
 
 #include "mov.c"
 #include "movi.c"
@@ -90,8 +104,22 @@ void reset_vm()
 #include "jabs.c"
 #include "je.c"
 #include "jne.c"
-#include "jn.c"
-#include "jnn.c"
+#include "jg.c"
+#include "jge.c"
+#include "jl.c"
+#include "jle.c"
+#include "ja.c"
+#include "jae.c"
+#include "jb.c"
+#include "jbe.c"
+
+#include "push.c"
+#include "pushi.c"
+#include "pop.c"
+
+#include "call.c"
+#include "callr.c"
+#include "ret.c"
 
 int main(void)
 {
@@ -132,8 +160,22 @@ int main(void)
     test_jabs();
     test_je();
     test_jne();
-    test_jn();
-    test_jnn();
+    test_jg();
+    test_jge();
+    test_jl();
+    test_jle();
+    test_ja();
+    test_jae();
+    test_jb();
+    test_jbe();
+
+    test_push();
+    test_pushi();
+    test_pop();
+
+    test_call();
+    test_callr();
+    test_ret();
 
     return 0;
 }

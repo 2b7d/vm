@@ -38,24 +38,41 @@ enum vm_opcode {
     DEC,   // reg8
     DECB,  // reg8
 
+    /*NEG,/*
+    /*NOT,*/
+    /*AND,*/
+    /*OR,*/
+    /*XOR,*/
+    /*SHL,*/
+    /*SHR,*/
+    /*SHRA,*/
+
     CMP,   // reg4 reg4
     CMPI,  // imm16 reg8
     CMPB,  // reg4 reg4
     CMPBI, // imm8 reg8
 
     JABS, // imm16
-    JE,
-    JNE,
-    JN,
-    JNN,
-    //JG,  // ~(SF ^ OF) & ~ZF
-    //JGE, // ~(SF ^ OF)
-    //JL,  // SF ^ OF
-    //JLE, // (SF ^ OF) | ZF
-    //JA,  // ~CF & ~ZF
-    //JAE, // ~CF
-    //JB,  // CF
-    //JBE, // CF | ZF
+    JE,   // imm16
+    JNE,  // imm16
+    JG,   // imm16
+    JGE,  // imm16
+    JL,   // imm16
+    JLE,  // imm16
+    JA,   // imm16
+    JAE,  // imm16
+    JB,   // imm16
+    JBE,  // imm16
+
+    PUSH,  // reg8
+    PUSHI, // imm16
+    POP,   // reg8
+
+    CALL,  // imm16
+    CALLR, // reg8
+    RET,
+
+    /*SYSCALL*/
 };
 
 enum vm_register {
@@ -118,6 +135,22 @@ uint16_t read_word(uint16_t addr)
     return (msb << 8) | lsb;
 }
 
+void stack_push(uint16_t val)
+{
+    regfile[RSP] -= 2;
+    write_word(val, regfile[RSP]);
+}
+
+uint16_t stack_pop(void)
+{
+    uint16_t val;
+
+    val = read_word(regfile[RSP]);
+    regfile[RSP] += 2;
+
+    return val;
+}
+
 void set_register_flags(int a, int b, int t)
 {
     regflags.zero = t == 0;
@@ -147,267 +180,267 @@ void vm_start(void)
             return;
 
         case MOV: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            regfile[dst] = regfile[src];
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = regfile[r1];
         } break;
 
         case MOVI: {
             uint16_t imm;
-            enum vm_register dst;
+            enum vm_register r1;
 
             imm = read_word(pc++); pc++;
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            regfile[dst] = imm;
+            regfile[r1] = imm;
         } break;
 
         case MOVB: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            regfile[dst] = (uint8_t) regfile[src];
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = (uint8_t) regfile[r1];
         } break;
 
         case MOVBE: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            regfile[dst] = (int8_t) regfile[src];
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = (int8_t) regfile[r1];
         } break;
 
         case ST: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            write_word(regfile[src], regfile[dst]);
+            decode_registers(read_byte(pc++), &r1, &r2);
+            write_word(regfile[r1], regfile[r2]);
         } break;
 
         case STI: {
-            enum vm_register src;
+            enum vm_register r1;
             uint16_t imm;
 
-            src = read_byte(pc++);
+            r1 = read_byte(pc++);
             imm = read_word(pc++); pc++;
-            write_word(regfile[src], imm);
+            write_word(regfile[r1], imm);
         } break;
 
         case STB: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            write_byte(regfile[src], regfile[dst]);
+            decode_registers(read_byte(pc++), &r1, &r2);
+            write_byte(regfile[r1], regfile[r2]);
         } break;
 
         case STBI: {
-            enum vm_register src;
+            enum vm_register r1;
             uint16_t imm;
 
-            src = read_byte(pc++);
+            r1 = read_byte(pc++);
             imm = read_word(pc++); pc++;
-            write_byte(regfile[src], imm);
+            write_byte(regfile[r1], imm);
         } break;
 
         case LD: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            regfile[dst] = read_word(regfile[src]);
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = read_word(regfile[r1]);
         } break;
 
         case LDI: {
-            enum vm_register dst;
+            enum vm_register r1;
             uint16_t imm;
 
             imm = read_word(pc++); pc++;
-            dst = read_byte(pc++);
-            regfile[dst] = read_word(imm);
+            r1 = read_byte(pc++);
+            regfile[r1] = read_word(imm);
         } break;
 
         case LDB: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
 
-            decode_registers(read_byte(pc++), &src, &dst);
-            regfile[dst] = read_byte(regfile[src]);
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = read_byte(regfile[r1]);
         } break;
 
         case LDBI: {
-            enum vm_register dst;
+            enum vm_register r1;
             uint16_t imm;
 
             imm = read_word(pc++); pc++;
-            dst = read_byte(pc++);
-            regfile[dst] = read_byte(imm);
+            r1 = read_byte(pc++);
+            regfile[r1] = read_byte(imm);
         } break;
 
         case ADD: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
             int16_t a, b, t;
 
-            decode_registers(read_byte(pc++), &src, &dst);
+            decode_registers(read_byte(pc++), &r1, &r2);
 
-            a = regfile[dst];
-            b = regfile[src];
+            a = regfile[r2];
+            b = regfile[r1];
             t = a + b;
 
-            regfile[dst] = t;
+            regfile[r2] = t;
             set_register_flags(a, b, t);
         } break;
 
         case ADDI: {
-            enum vm_register dst;
+            enum vm_register r1;
             int16_t a, b, t;
 
             b = read_word(pc++); pc++;
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             t = a + b;
 
-            regfile[dst] = t;
+            regfile[r1] = t;
             set_register_flags(a, b, t);
         } break;
 
         case ADDB: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
             int8_t a, b, t;
 
-            decode_registers(read_byte(pc++), &src, &dst);
+            decode_registers(read_byte(pc++), &r1, &r2);
 
-            a = regfile[dst];
-            b = regfile[src];
+            a = regfile[r2];
+            b = regfile[r1];
             t = a + b;
 
-            regfile[dst] = (uint8_t) t;
+            regfile[r2] = (uint8_t) t;
             set_register_flags(a, b, t);
         } break;
 
         case ADDBI: {
-            enum vm_register dst;
+            enum vm_register r1;
             int8_t a, b, t;
 
             b = read_byte(pc++);
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             t = a + b;
 
-            regfile[dst] = (uint8_t) t;
+            regfile[r1] = (uint8_t) t;
             set_register_flags(a, b, t);
         } break;
 
         case INC: {
-            enum vm_register dst;
+            enum vm_register r1;
             int16_t a, b, t;
 
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             b = 1;
             t = a + b;
 
-            regfile[dst] = t;
+            regfile[r1] = t;
             set_register_flags(a, b, t);
         } break;
 
         case INCB: {
-            enum vm_register dst;
+            enum vm_register r1;
             int8_t a, b, t;
 
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             b = 1;
             t = a + b;
 
-            regfile[dst] = (uint8_t) t;
+            regfile[r1] = (uint8_t) t;
             set_register_flags(a, b, t);
         } break;
 
         case SUB: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
             int16_t a, b, t;
 
-            decode_registers(read_byte(pc++), &src, &dst);
+            decode_registers(read_byte(pc++), &r1, &r2);
 
-            a = regfile[dst];
-            b = -regfile[src];
+            a = regfile[r2];
+            b = -regfile[r1];
             t = a + b;
 
-            regfile[dst] = t;
+            regfile[r2] = t;
             set_register_flags(a, b, t);
         } break;
 
         case SUBI: {
-            enum vm_register dst;
+            enum vm_register r1;
             int16_t a, b, t;
 
             b = read_word(pc++); pc++;
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             b = -b;
             t = a + b;
 
-            regfile[dst] = t;
+            regfile[r1] = t;
             set_register_flags(a, b, t);
         } break;
 
         case SUBB: {
-            enum vm_register src, dst;
+            enum vm_register r1, r2;
             int8_t a, b, t;
 
-            decode_registers(read_byte(pc++), &src, &dst);
+            decode_registers(read_byte(pc++), &r1, &r2);
 
-            a = regfile[dst];
-            b = -regfile[src];
+            a = regfile[r2];
+            b = -regfile[r1];
             t = a + b;
 
-            regfile[dst] = (uint8_t) t;
+            regfile[r2] = (uint8_t) t;
             set_register_flags(a, b, t);
         } break;
 
         case SUBBI: {
-            enum vm_register dst;
+            enum vm_register r1;
             int8_t a, b, t;
 
             b = read_byte(pc++);
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             b = -b;
             t = a + b;
 
-            regfile[dst] = (uint8_t) t;
+            regfile[r1] = (uint8_t) t;
             set_register_flags(a, b, t);
         } break;
 
         case DEC: {
-            enum vm_register dst;
+            enum vm_register r1;
             int16_t a, b, t;
 
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             b = -1;
             t = a + b;
 
-            regfile[dst] = t;
+            regfile[r1] = t;
             set_register_flags(a, b, t);
         } break;
 
         case DECB: {
-            enum vm_register dst;
+            enum vm_register r1;
             int8_t a, b, t;
 
-            dst = read_byte(pc++);
+            r1 = read_byte(pc++);
 
-            a = regfile[dst];
+            a = regfile[r1];
             b = -1;
             t = a + b;
 
-            regfile[dst] = (uint8_t) t;
+            regfile[r1] = (uint8_t) t;
             set_register_flags(a, b, t);
         } break;
 
@@ -485,21 +518,110 @@ void vm_start(void)
             }
         } break;
 
-        case JN: {
-            if (regflags.negative == 1) {
+        case JG: {
+            if (!(regflags.negative ^ regflags.sign_overflow) && !regflags.zero) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
             }
         } break;
 
-        case JNN: {
-            if (regflags.negative == 0) {
+        case JGE: {
+            if (!(regflags.negative ^ regflags.sign_overflow)) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
             }
         } break;
+
+        case JL: {
+            if (regflags.negative ^ regflags.sign_overflow) {
+                pc = read_word(pc);
+            } else {
+                pc += 2;
+            }
+        } break;
+
+        case JLE: {
+            if ((regflags.negative ^ regflags.sign_overflow) || regflags.zero) {
+                pc = read_word(pc);
+            } else {
+                pc += 2;
+            }
+        } break;
+
+        case JA: {
+            if (regflags.unsign_overflow && !regflags.zero) {
+                pc = read_word(pc);
+            } else {
+                pc += 2;
+            }
+        } break;
+
+        case JAE: {
+            if (regflags.unsign_overflow) {
+                pc = read_word(pc);
+            } else {
+                pc += 2;
+            }
+        } break;
+
+        case JB: {
+            if (!regflags.unsign_overflow) {
+                pc = read_word(pc);
+            } else {
+                pc += 2;
+            }
+        } break;
+
+        case JBE: {
+            if (!regflags.unsign_overflow || regflags.zero) {
+                pc = read_word(pc);
+            } else {
+                pc += 2;
+            }
+        } break;
+
+        case PUSH: {
+            enum vm_register r1;
+
+            r1 = read_byte(pc++);
+            stack_push(regfile[r1]);
+        } break;
+
+        case PUSHI: {
+            uint16_t imm;
+
+            imm = read_word(pc++); pc++;
+            stack_push(imm);
+        } break;
+
+        case POP: {
+            enum vm_register r1;
+
+            r1 = read_byte(pc++);
+            regfile[r1] = stack_pop();
+        } break;
+
+        case CALL: {
+            uint16_t imm;
+
+            imm = read_word(pc++); pc++;
+            stack_push(pc);
+            pc = imm;
+        } break;
+
+        case CALLR: {
+            enum vm_register r1;
+
+            r1 = read_byte(pc++);
+            stack_push(pc);
+            pc = regfile[r1];
+        } break;
+
+        case RET:
+            pc = stack_pop();
+            break;
 
         default:
             fprintf(stderr, "unknown opcode `%02x` at ram[%d]\n", opcode, saved_pc);
