@@ -12,9 +12,11 @@ enum vm_opcode {
     MOV,   // reg4 reg4
     MOVI,  // imm16 reg8
     MOVB,  // reg4 reg4
-    MOVBE, // reg4 reg4
+    MOVBI, // imm8 reg8
+    MOVZE, // reg4 reg4
+    MOVSE, // reg4 reg4
 
-    ST,   // reg4 reg 4
+    ST,   // reg4 reg4
     STI,  // reg8 imm16
     STB,  // reg4 reg4
     STBI, // reg8 imm16
@@ -28,17 +30,12 @@ enum vm_opcode {
     ADDI,  // imm16 reg8
     ADDB,  // reg4 reg4
     ADDBI, // imm8 reg8
-    INC,   // reg8
-    INCB,  // reg8
 
     SUB,   // reg4 reg4
     SUBI,  // imm16 reg8
     SUBB,  // reg4 reg4
     SUBBI, // imm8 reg8
-    DEC,   // reg8
-    DECB,  // reg8
 
-    /*NEG,/*
     /*NOT,*/
     /*AND,*/
     /*OR,*/
@@ -94,19 +91,21 @@ enum vm_register {
     RSP,
     RBP,
 
-    RCOUNT
+    VM_REGISTER_COUNT
 };
 
-struct register_flags {
-    int zero;
-    int negative;
-    int sign_overflow;
-    int unsign_overflow;
+enum vm_flag {
+    ZF,
+    SF,
+    CF,
+    OF,
+
+    VM_FLAG_COUNT
 };
 
 uint8_t ram[RAM_CAP];
-uint16_t regfile[RCOUNT];
-struct register_flags regflags;
+uint16_t regfile[VM_REGISTER_COUNT];
+int flags[VM_FLAG_COUNT];
 int pc;
 
 void write_byte(uint8_t val, uint16_t addr)
@@ -151,18 +150,31 @@ uint16_t stack_pop(void)
     return val;
 }
 
-void set_register_flags(int a, int b, int t)
+void set_flags_add(int16_t a, int16_t b, int16_t t)
 {
-    regflags.zero = t == 0;
-    regflags.negative = t < 0;
-    regflags.sign_overflow = (a < 0 && b < 0 && t >= 0) || (a >= 0 && b >= 0 && t < 0);
-    regflags.unsign_overflow = (unsigned) t < (unsigned) a;
+    flags[ZF] = t == 0;
+    flags[SF] = t < 0;
+    flags[OF] = (a < 0 && b < 0 && t >= 0) || (a >= 0 && b >= 0 && t < 0);
+    flags[CF] = (uint16_t) t < (uint16_t) a;
+}
+
+void set_flags_sub(int16_t a, int16_t b, int16_t t)
+{
+    flags[ZF] = t == 0;
+    flags[SF] = t < 0;
+    flags[OF] = (a < 0 && b >= 0 && t >= 0) || (a >= 0 && b < 0 && t < 0);
+    flags[CF] = (uint16_t) t < (uint16_t) a;
 }
 
 void decode_registers(uint8_t byte, enum vm_register *r1, enum vm_register *r2)
 {
     *r1 = byte >> 4;
     *r2 = byte & 0x0f;
+}
+
+void register_write_byte(enum vm_register r, uint8_t val)
+{
+    regfile[r] = (regfile[r] & 0xff00) | val;
 }
 
 // TODO(art), 25.04.25: return status code or something
@@ -200,10 +212,27 @@ void vm_start(void)
             enum vm_register r1, r2;
 
             decode_registers(read_byte(pc++), &r1, &r2);
+            register_write_byte(r2, regfile[r1]);
+        } break;
+
+        case MOVBI: {
+            uint8_t imm;
+            enum vm_register r1;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+
+            register_write_byte(r1, imm);
+        } break;
+
+        case MOVZE: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
             regfile[r2] = (uint8_t) regfile[r1];
         } break;
 
-        case MOVBE: {
+        case MOVSE: {
             enum vm_register r1, r2;
 
             decode_registers(read_byte(pc++), &r1, &r2);
@@ -262,7 +291,7 @@ void vm_start(void)
             enum vm_register r1, r2;
 
             decode_registers(read_byte(pc++), &r1, &r2);
-            regfile[r2] = read_byte(regfile[r1]);
+            register_write_byte(r2, read_byte(regfile[r1]));
         } break;
 
         case LDBI: {
@@ -271,7 +300,7 @@ void vm_start(void)
 
             imm = read_word(pc++); pc++;
             r1 = read_byte(pc++);
-            regfile[r1] = read_byte(imm);
+            register_write_byte(r1, read_byte(imm));
         } break;
 
         case ADD: {
@@ -285,7 +314,7 @@ void vm_start(void)
             t = a + b;
 
             regfile[r2] = t;
-            set_register_flags(a, b, t);
+            set_flags_add(a, b, t);
         } break;
 
         case ADDI: {
@@ -299,7 +328,7 @@ void vm_start(void)
             t = a + b;
 
             regfile[r1] = t;
-            set_register_flags(a, b, t);
+            set_flags_add(a, b, t);
         } break;
 
         case ADDB: {
@@ -312,8 +341,8 @@ void vm_start(void)
             b = regfile[r1];
             t = a + b;
 
-            regfile[r2] = (uint8_t) t;
-            set_register_flags(a, b, t);
+            register_write_byte(r2, t);
+            set_flags_add(a, b, t);
         } break;
 
         case ADDBI: {
@@ -326,36 +355,8 @@ void vm_start(void)
             a = regfile[r1];
             t = a + b;
 
-            regfile[r1] = (uint8_t) t;
-            set_register_flags(a, b, t);
-        } break;
-
-        case INC: {
-            enum vm_register r1;
-            int16_t a, b, t;
-
-            r1 = read_byte(pc++);
-
-            a = regfile[r1];
-            b = 1;
-            t = a + b;
-
-            regfile[r1] = t;
-            set_register_flags(a, b, t);
-        } break;
-
-        case INCB: {
-            enum vm_register r1;
-            int8_t a, b, t;
-
-            r1 = read_byte(pc++);
-
-            a = regfile[r1];
-            b = 1;
-            t = a + b;
-
-            regfile[r1] = (uint8_t) t;
-            set_register_flags(a, b, t);
+            register_write_byte(r1, t);
+            set_flags_add(a, b, t);
         } break;
 
         case SUB: {
@@ -365,11 +366,11 @@ void vm_start(void)
             decode_registers(read_byte(pc++), &r1, &r2);
 
             a = regfile[r2];
-            b = -regfile[r1];
-            t = a + b;
+            b = regfile[r1];
+            t = a - b;
 
             regfile[r2] = t;
-            set_register_flags(a, b, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case SUBI: {
@@ -380,11 +381,10 @@ void vm_start(void)
             r1 = read_byte(pc++);
 
             a = regfile[r1];
-            b = -b;
-            t = a + b;
+            t = a - b;
 
             regfile[r1] = t;
-            set_register_flags(a, b, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case SUBB: {
@@ -394,11 +394,11 @@ void vm_start(void)
             decode_registers(read_byte(pc++), &r1, &r2);
 
             a = regfile[r2];
-            b = -regfile[r1];
-            t = a + b;
+            b = regfile[r1];
+            t = a - b;
 
-            regfile[r2] = (uint8_t) t;
-            set_register_flags(a, b, t);
+            register_write_byte(r2, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case SUBBI: {
@@ -409,39 +409,10 @@ void vm_start(void)
             r1 = read_byte(pc++);
 
             a = regfile[r1];
-            b = -b;
-            t = a + b;
+            t = a - b;
 
-            regfile[r1] = (uint8_t) t;
-            set_register_flags(a, b, t);
-        } break;
-
-        case DEC: {
-            enum vm_register r1;
-            int16_t a, b, t;
-
-            r1 = read_byte(pc++);
-
-            a = regfile[r1];
-            b = -1;
-            t = a + b;
-
-            regfile[r1] = t;
-            set_register_flags(a, b, t);
-        } break;
-
-        case DECB: {
-            enum vm_register r1;
-            int8_t a, b, t;
-
-            r1 = read_byte(pc++);
-
-            a = regfile[r1];
-            b = -1;
-            t = a + b;
-
-            regfile[r1] = (uint8_t) t;
-            set_register_flags(a, b, t);
+            register_write_byte(r1, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case CMP: {
@@ -451,10 +422,10 @@ void vm_start(void)
             decode_registers(read_byte(pc++), &r1, &r2);
 
             a = regfile[r2];
-            b = -regfile[r1];
-            t = a + b;
+            b = regfile[r1];
+            t = a - b;
 
-            set_register_flags(a, b, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case CMPI: {
@@ -465,10 +436,9 @@ void vm_start(void)
             r1 = read_byte(pc++);
 
             a = regfile[r1];
-            b = -b;
-            t = a + b;
+            t = a - b;
 
-            set_register_flags(a, b, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case CMPB: {
@@ -478,10 +448,10 @@ void vm_start(void)
             decode_registers(read_byte(pc++), &r1, &r2);
 
             a = regfile[r2];
-            b = -regfile[r1];
-            t = a + b;
+            b = regfile[r1];
+            t = a - b;
 
-            set_register_flags(a, b, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case CMPBI: {
@@ -492,10 +462,9 @@ void vm_start(void)
             r1 = read_byte(pc++);
 
             a = regfile[r1];
-            b = -b;
-            t = a + b;
+            t = a - b;
 
-            set_register_flags(a, b, t);
+            set_flags_sub(a, b, t);
         } break;
 
         case JABS:
@@ -503,7 +472,7 @@ void vm_start(void)
             break;
 
         case JE: {
-            if (regflags.zero == 1) {
+            if (flags[ZF] == 1) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -511,7 +480,7 @@ void vm_start(void)
         } break;
 
         case JNE: {
-            if (regflags.zero == 0) {
+            if (flags[ZF] == 0) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -519,7 +488,7 @@ void vm_start(void)
         } break;
 
         case JG: {
-            if (!(regflags.negative ^ regflags.sign_overflow) && !regflags.zero) {
+            if (!(flags[SF] ^ flags[OF]) && !flags[ZF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -527,7 +496,7 @@ void vm_start(void)
         } break;
 
         case JGE: {
-            if (!(regflags.negative ^ regflags.sign_overflow)) {
+            if (!(flags[SF] ^ flags[OF])) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -535,7 +504,7 @@ void vm_start(void)
         } break;
 
         case JL: {
-            if (regflags.negative ^ regflags.sign_overflow) {
+            if (flags[SF] ^ flags[OF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -543,7 +512,7 @@ void vm_start(void)
         } break;
 
         case JLE: {
-            if ((regflags.negative ^ regflags.sign_overflow) || regflags.zero) {
+            if ((flags[SF] ^ flags[OF]) || flags[ZF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -551,7 +520,7 @@ void vm_start(void)
         } break;
 
         case JA: {
-            if (regflags.unsign_overflow && !regflags.zero) {
+            if (flags[CF] && !flags[ZF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -559,7 +528,7 @@ void vm_start(void)
         } break;
 
         case JAE: {
-            if (regflags.unsign_overflow) {
+            if (flags[CF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -567,7 +536,7 @@ void vm_start(void)
         } break;
 
         case JB: {
-            if (!regflags.unsign_overflow) {
+            if (!flags[CF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -575,7 +544,7 @@ void vm_start(void)
         } break;
 
         case JBE: {
-            if (!regflags.unsign_overflow || regflags.zero) {
+            if (!flags[CF] || flags[ZF]) {
                 pc = read_word(pc);
             } else {
                 pc += 2;
@@ -636,7 +605,7 @@ int main(void)
 {
     memset(ram, 0, sizeof(ram));
     memset(regfile, 0, sizeof(regfile));
-    memset(&regflags, 0, sizeof(regflags));
+    memset(&flags, 0, sizeof(flags));
     pc = 0;
 
     printf("ram {");
@@ -651,9 +620,9 @@ int main(void)
     vm_start();
 
     printf("regfile {");
-    for (int i = 0; i < RCOUNT; ++i) {
+    for (int i = 0; i < VM_REGISTER_COUNT; ++i) {
         printf("%04x", regfile[i]);
-        if (i < RCOUNT - 1) {
+        if (i < VM_REGISTER_COUNT - 1) {
             printf(", ");
         }
     }

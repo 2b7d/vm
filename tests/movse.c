@@ -1,25 +1,25 @@
-void test_movbe()
+void test_movse()
 {
     struct test_case {
         char *title;
-        uint8_t a;
+        uint16_t a;
         uint16_t expect;
     };
 
     struct test_case cases[] = {
         {
-            .title = "extends sign",
-            .a = 0x80,
+            .title = "extends sign if sign bit is set",
+            .a = 0xab80,
             .expect = 0xff80
         },
         {
-            .title = "does not extend sign",
-            .a = 0x7f,
+            .title = "does not extend sign if sign bit is not set",
+            .a = 0xab7f,
             .expect = 0x007f
         }
     };
 
-    printf("test_movbe\n");
+    printf("test_movse\n");
 
     for (int i = 0; i < arrlen(cases); ++i) {
         struct test_case tcase = cases[i];
@@ -28,12 +28,12 @@ void test_movbe()
         reset_vm();
 
         regfile[R10] = tcase.a;
-        movbe(R10, R11);
+        movse(R10, R10);
         halt();
 
         pc = 0;
         vm_start();
 
-        assert(regfile[R11] == tcase.expect);
+        assert(regfile[R10] == tcase.expect);
     }
 }

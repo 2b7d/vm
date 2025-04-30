@@ -3,13 +3,15 @@ void test_ldbi()
     printf("test_ldbi\n");
     reset_vm();
 
-    write_byte(0x69, 69);
+    write_byte(0x80, 100);
+    regfile[R10] = 0xabcd;
 
-    ldbi(69, R10);
+    ldbi(100, R10);
     halt();
 
     pc = 0;
     vm_start();
 
-    assert(regfile[R10] == read_byte(69));
+    assert(regfile[R10] == 0xab80);
 }
+

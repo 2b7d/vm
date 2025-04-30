@@ -3,8 +3,8 @@ void test_stb()
     printf("test_stb\n");
     reset_vm();
 
-    regfile[R10] = 0x69;
-    regfile[R11] = 69;
+    regfile[R10] = 0xabcd;
+    regfile[R11] = 100;
 
     stb(R10, R11);
     halt();
@@ -12,5 +12,5 @@ void test_stb()
     pc = 0;
     vm_start();
 
-    assert(read_byte(regfile[R11]) == regfile[R10]);
+    assert(read_byte(regfile[R11]) == 0xcd);
 }
