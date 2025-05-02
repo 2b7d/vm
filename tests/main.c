@@ -40,7 +40,12 @@ void reset_vm()
 #define subb(r1, r2) write_byte(SUBB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define subbi(imm, r) write_byte(SUBBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
 
-#define neg(r) write_byte(NEG, pc++), write_byte((r), pc++)
+#define not(r) write_byte(NOT, pc++), write_byte((r), pc++)
+#define notb(r) write_byte(NOTB, pc++), write_byte((r), pc++)
+#define and(r1, r2) write_byte(AND, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define andi(imm, r) write_byte(ANDI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
+#define andb(r1, r2) write_byte(ANDB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define andbi(imm, r) write_byte(ANDBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
 
 #define cmp(r1, r2) write_byte(CMP, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define cmpi(imm, r) write_byte(CMPI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
@@ -93,6 +98,13 @@ void reset_vm()
 #include "subi.c"
 #include "subb.c"
 #include "subbi.c"
+
+#include "not.c"
+#include "notb.c"
+#include "and.c"
+#include "andi.c"
+#include "andb.c"
+#include "andbi.c"
 
 #include "cmp.c"
 #include "cmpi.c"
@@ -147,6 +159,13 @@ int main(void)
     test_subi();
     test_subb();
     test_subbi();
+
+    test_not();
+    test_notb();
+    test_and();
+    test_andi();
+    test_andb();
+    test_andbi();
 
     test_cmp();
     test_cmpi();

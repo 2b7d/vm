@@ -15,8 +15,7 @@ void test_subbi()
         pc = 0;
         vm_start();
 
-        assert(regfile[R10] == tcase.expect_result);
-        assert(flags[tcase.expect_flag] == 1);
+        assert(regfile[R10] == tcase.expect);
     }
 }
 

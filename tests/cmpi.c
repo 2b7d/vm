@@ -2,8 +2,8 @@ void test_cmpi()
 {
     printf("test_cmpi\n");
 
-    for (int i = 0; i < arrlen(sub_cases); ++i) {
-        struct sub_test_case tcase = sub_cases[i];
+    for (int i = 0; i < arrlen(cmp_cases); ++i) {
+        struct cmp_test_case tcase = cmp_cases[i];
 
         printf("    %s\n", tcase.title);
         reset_vm();
@@ -15,7 +15,7 @@ void test_cmpi()
         pc = 0;
         vm_start();
 
-        assert(flags[tcase.flag] == tcase.expect_flag);
+        assert(flags[tcase.flag] == tcase.expect);
     }
 }
 

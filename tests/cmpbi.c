@@ -2,8 +2,8 @@ void test_cmpbi()
 {
     printf("test_cmpbi\n");
 
-    for (int i = 0; i < arrlen(subb_cases); ++i) {
-        struct subb_test_case tcase = subb_cases[i];
+    for (int i = 0; i < arrlen(cmpb_cases); ++i) {
+        struct cmpb_test_case tcase = cmpb_cases[i];
 
         printf("    %s\n", tcase.title);
         reset_vm();
@@ -15,7 +15,7 @@ void test_cmpbi()
         pc = 0;
         vm_start();
 
-        assert(flags[tcase.expect_flag] == 1);
+        assert(flags[tcase.flag] == tcase.expect);
     }
 }
 
