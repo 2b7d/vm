@@ -24,7 +24,6 @@ void reset_vm()
 #define sti(r, imm) write_byte(STI, pc++), write_byte((r), pc++), write_word((imm), pc++), pc++
 #define stb(r1, r2) write_byte(STB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define stbi(r, imm) write_byte(STBI, pc++), write_byte((r), pc++), write_word((imm), pc++), pc++
-
 #define ld(r1, r2) write_byte(LD, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define ldi(imm, r) write_byte(LDI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
 #define ldb(r1, r2) write_byte(LDB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
@@ -34,7 +33,6 @@ void reset_vm()
 #define addi(imm, r) write_byte(ADDI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
 #define addb(r1, r2) write_byte(ADDB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define addbi(imm, r) write_byte(ADDBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
-
 #define sub(r1, r2) write_byte(SUB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define subi(imm, r) write_byte(SUBI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
 #define subb(r1, r2) write_byte(SUBB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
@@ -46,6 +44,27 @@ void reset_vm()
 #define andi(imm, r) write_byte(ANDI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
 #define andb(r1, r2) write_byte(ANDB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define andbi(imm, r) write_byte(ANDBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define or(r1, r2) write_byte(OR, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define ori(imm, r) write_byte(ORI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
+#define orb(r1, r2) write_byte(ORB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define orbi(imm, r) write_byte(ORBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define xor(r1, r2) write_byte(XOR, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define xori(imm, r) write_byte(XORI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
+#define xorb(r1, r2) write_byte(XORB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define xorbi(imm, r) write_byte(XORBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+
+#define shl(r1, r2) write_byte(SHL, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define shli(imm, r) write_byte(SHLI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define shlb(r1, r2) write_byte(SHLB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define shlbi(imm, r) write_byte(SHLBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define shr(r1, r2) write_byte(SHR, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define shri(imm, r) write_byte(SHRI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define shrb(r1, r2) write_byte(SHRB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define shrbi(imm, r) write_byte(SHRBI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define shra(r1, r2) write_byte(SHRA, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define shrai(imm, r) write_byte(SHRAI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
+#define shrab(r1, r2) write_byte(SHRAB, pc++), write_byte(encode_registers((r1), (r2)), pc++)
+#define shrabi(imm, r) write_byte(SHRABI, pc++), write_byte((imm), pc++), write_byte((r), pc++)
 
 #define cmp(r1, r2) write_byte(CMP, pc++), write_byte(encode_registers((r1), (r2)), pc++)
 #define cmpi(imm, r) write_byte(CMPI, pc++), write_word((imm), pc++), pc++, write_byte((r), pc++)
@@ -67,7 +86,6 @@ void reset_vm()
 #define push(r) write_byte(PUSH, pc++), write_byte((r), pc++)
 #define pushi(imm) write_byte(PUSHI, pc++), write_word((imm), pc++), pc++
 #define pop(r) write_byte(POP, pc++), write_byte((r), pc++)
-
 #define call(imm) write_byte(CALL, pc++), write_word((imm), pc++), pc++
 #define callr(r) write_byte(CALLR, pc++), write_byte((r), pc++)
 #define ret() write_byte(RET, pc++)
@@ -83,7 +101,6 @@ void reset_vm()
 #include "sti.c"
 #include "stb.c"
 #include "stbi.c"
-
 #include "ld.c"
 #include "ldi.c"
 #include "ldb.c"
@@ -93,7 +110,6 @@ void reset_vm()
 #include "addi.c"
 #include "addb.c"
 #include "addbi.c"
-
 #include "sub.c"
 #include "subi.c"
 #include "subb.c"
@@ -105,6 +121,27 @@ void reset_vm()
 #include "andi.c"
 #include "andb.c"
 #include "andbi.c"
+#include "or.c"
+#include "ori.c"
+#include "orb.c"
+#include "orbi.c"
+#include "xor.c"
+#include "xori.c"
+#include "xorb.c"
+#include "xorbi.c"
+
+#include "shl.c"
+#include "shli.c"
+#include "shlb.c"
+#include "shlbi.c"
+#include "shr.c"
+#include "shri.c"
+#include "shrb.c"
+#include "shrbi.c"
+#include "shra.c"
+#include "shrai.c"
+#include "shrab.c"
+#include "shrabi.c"
 
 #include "cmp.c"
 #include "cmpi.c"
@@ -126,7 +163,6 @@ void reset_vm()
 #include "push.c"
 #include "pushi.c"
 #include "pop.c"
-
 #include "call.c"
 #include "callr.c"
 #include "ret.c"
@@ -144,7 +180,6 @@ int main(void)
     test_sti();
     test_stb();
     test_stbi();
-
     test_ld();
     test_ldi();
     test_ldb();
@@ -154,7 +189,6 @@ int main(void)
     test_addi();
     test_addb();
     test_addbi();
-
     test_sub();
     test_subi();
     test_subb();
@@ -166,6 +200,27 @@ int main(void)
     test_andi();
     test_andb();
     test_andbi();
+    test_or();
+    test_ori();
+    test_orb();
+    test_orbi();
+    test_xor();
+    test_xori();
+    test_xorb();
+    test_xorbi();
+
+    test_shl();
+    test_shli();
+    test_shlb();
+    test_shlbi();
+    test_shr();
+    test_shri();
+    test_shrb();
+    test_shrbi();
+    test_shra();
+    test_shrai();
+    test_shrab();
+    test_shrabi();
 
     test_cmp();
     test_cmpi();
@@ -187,7 +242,6 @@ int main(void)
     test_push();
     test_pushi();
     test_pop();
-
     test_call();
     test_callr();
     test_ret();

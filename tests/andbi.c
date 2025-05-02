@@ -10,6 +10,5 @@ void test_andbi()
     pc = 0;
     vm_start();
 
-    printf("0x%04x\n", regfile[R10]);
     assert(regfile[R10] == 0xab0d);
 }

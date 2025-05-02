@@ -20,7 +20,6 @@ enum vm_opcode {
     STI,  // reg8 imm16
     STB,  // reg4 reg4
     STBI, // reg8 imm16
-
     LD,   // reg4 reg4
     LDI,  // imm16 reg8
     LDB,  // reg4 reg4
@@ -30,7 +29,6 @@ enum vm_opcode {
     ADDI,  // imm16 reg8
     ADDB,  // reg4 reg4
     ADDBI, // imm8 reg8
-
     SUB,   // reg4 reg4
     SUBI,  // imm16 reg8
     SUBB,  // reg4 reg4
@@ -42,19 +40,27 @@ enum vm_opcode {
     ANDI,  // imm16 reg8
     ANDB,  // reg4 reg4
     ANDBI, // imm8 reg8
+    OR,    // reg4 reg4
+    ORI,   // imm16 reg8
+    ORB,   // reg4 reg4
+    ORBI,  // imm8 reg8
+    XOR,   // reg4 reg4
+    XORI,  // imm16 reg8
+    XORB,  // reg4 reg4
+    XORBI, // imm8 reg8
 
-    /*OR,   // reg4 reg4*/
-    /*ORI,  // imm16 reg8*/
-    /*ORB,  // reg4 reg4*/
-    /*ORBI, // imm8 reg8*/
-
-    /*XOR,   // reg4 reg4*/
-    /*XORI,  // imm16 reg8*/
-    /*XORB,  // reg4 reg4*/
-    /*XORBI, // imm8 reg8*/
-    /*SHL,*/
-    /*SHR,*/
-    /*SHRA,*/
+    SHL,    // reg4 reg4
+    SHLI,   // imm8 reg8
+    SHLB,   // reg4 reg4
+    SHLBI,  // imm8 reg8
+    SHR,    // reg4 reg4
+    SHRI,   // imm8 reg8
+    SHRB,   // reg4 reg4
+    SHRBI,  // imm8 reg8
+    SHRA,   // reg4 reg4
+    SHRAI,  // imm8 reg8
+    SHRAB,  // reg4 reg4
+    SHRABI, // imm8 reg8
 
     CMP,   // reg4 reg4
     CMPI,  // imm16 reg8
@@ -76,7 +82,6 @@ enum vm_opcode {
     PUSH,  // reg8
     PUSHI, // imm16
     POP,   // reg8
-
     CALL,  // imm16
     CALLR, // reg8
     RET,
@@ -421,6 +426,195 @@ void vm_start(void)
             r1 = read_byte(pc++);
 
             register_write_byte(r1, regfile[r1] & imm);
+        } break;
+
+        case OR: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = regfile[r2] | regfile[r1];
+        } break;
+
+        case ORI: {
+            enum vm_register r1;
+            uint16_t imm;
+
+            imm = read_word(pc++); pc++;
+            r1 = read_byte(pc++);
+
+            regfile[r1] = regfile[r1] | imm;
+        } break;
+
+        case ORB: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            register_write_byte(r2, regfile[r2] | regfile[r1]);
+        } break;
+
+        case ORBI: {
+            enum vm_register r1;
+            uint8_t imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+
+            register_write_byte(r1, regfile[r1] | imm);
+        } break;
+
+        case XOR: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = regfile[r2] ^ regfile[r1];
+        } break;
+
+        case XORI: {
+            enum vm_register r1;
+            uint16_t imm;
+
+            imm = read_word(pc++); pc++;
+            r1 = read_byte(pc++);
+
+            regfile[r1] = regfile[r1] ^ imm;
+        } break;
+
+        case XORB: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            register_write_byte(r2, regfile[r2] ^ regfile[r1]);
+        } break;
+
+        case XORBI: {
+            enum vm_register r1;
+            uint8_t imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+
+            register_write_byte(r1, regfile[r1] ^ imm);
+        } break;
+
+        case SHL: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = regfile[r2] << regfile[r1];
+        } break;
+
+        case SHLI: {
+            enum vm_register r1;
+            uint8_t imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+
+            regfile[r1] = regfile[r1] << imm;
+        } break;
+
+        case SHLB: {
+            enum vm_register r1, r2;
+            uint8_t a;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            a = regfile[r1];
+
+            register_write_byte(r2, regfile[r2] << a);
+        } break;
+
+        case SHLBI: {
+            enum vm_register r1;
+            uint8_t imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+
+            register_write_byte(r1, regfile[r1] << imm);
+        } break;
+
+        case SHR: {
+            enum vm_register r1, r2;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            regfile[r2] = regfile[r2] >> regfile[r1];
+        } break;
+
+        case SHRI: {
+            enum vm_register r1;
+            uint8_t imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+
+            regfile[r1] = regfile[r1] >> imm;
+        } break;
+
+        case SHRB: {
+            enum vm_register r1, r2;
+            uint8_t a, b;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            a = regfile[r2];
+            b = regfile[r1];
+
+            register_write_byte(r2, a >> b);
+        } break;
+
+        case SHRBI: {
+            enum vm_register r1;
+            uint8_t a, imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+            a = regfile[r1];
+
+            register_write_byte(r1, a >> imm);
+        } break;
+
+        case SHRA: {
+            enum vm_register r1, r2;
+            int16_t a, b;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            a = regfile[r2];
+            b = regfile[r1];
+
+            regfile[r2] = a >> b;
+        } break;
+
+        case SHRAI: {
+            enum vm_register r1;
+            int16_t a;
+            int8_t imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+            a = regfile[r1];
+
+            regfile[r1] = a >> imm;
+        } break;
+
+        case SHRAB: {
+            enum vm_register r1, r2;
+            int8_t a, b;
+
+            decode_registers(read_byte(pc++), &r1, &r2);
+            a = regfile[r2];
+            b = regfile[r1];
+
+            register_write_byte(r2, a >> b);
+        } break;
+
+        case SHRABI: {
+            enum vm_register r1;
+            int8_t a, imm;
+
+            imm = read_byte(pc++);
+            r1 = read_byte(pc++);
+            a = regfile[r1];
+
+            register_write_byte(r1, a >> imm);
         } break;
 
         case CMP: {
