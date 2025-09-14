@@ -9,7 +9,7 @@ outfile=vm
 if [[ $1 = "prod" ]]; then
     flags+=" -Wall -Wextra -Werror -pedantic -s -O3"
 elif [[ $1 = "test" ]]; then
-    flags+=" -DTEST"
+    flags+=" -D TEST"
 else
     flags+=" -ggdb"
 fi
